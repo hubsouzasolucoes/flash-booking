@@ -2,3 +2,9 @@ target/
 .idea/
 *.iml
 .DS_Store
+logs/
+*.log
+.env
+.env.*
+!.env.example
+*.tmp

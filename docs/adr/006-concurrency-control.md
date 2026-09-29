@@ -1,4 +1,8 @@
-# ADR 006 — Controle de concorrência no PostgreSQL
+# ADR-006: Controle de concorrência no PostgreSQL
+
+## Status
+
+Accepted
 
 ## Context
 
@@ -13,7 +17,7 @@ RETURNING ...`; cada mudança incrementa a versão do evento. A chave idempotent
 `FOR UPDATE`; workers de expiração adquirem lotes com `FOR UPDATE SKIP LOCKED`. Estado, capacidade, registro idempotente
 e Outbox compartilham a transação `READ COMMITTED` padrão.
 
-## Alternatives
+## Alternatives Considered
 
 `synchronized` foi rejeitado por ser local à JVM. Redis adicionaria infraestrutura sem melhorar a atomicidade do write
 model. `SERIALIZABLE` global reduziria concorrência e não é necessário. Optimistic locking exigiria retry sob contenção.

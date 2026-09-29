@@ -19,12 +19,11 @@ Containers são compartilhados dentro de cada classe, nunca criados por método.
 ## Commands
 
 ```bash
-mvn test
-mvn clean verify
+./mvnw clean test
+./mvnw clean verify
 ```
 
-Java 21 e Maven são necessários. O repositório ainda não contém Maven Wrapper; isso permanece uma lacuna explícita de
-reprodutibilidade. A suíte `verify` requer um daemon Docker acessível ao Testcontainers e não requer o Compose rodando.
+Java 21 é necessário fora do container. O Maven Wrapper versionado baixa Maven 3.9.11 na primeira execução. A suíte `verify` requer um daemon Docker acessível ao Testcontainers e não requer o Compose rodando.
 Quando Docker não está disponível, testes marcados com `disabledWithoutDocker` são ignorados em vez de usar H2.
 
 ## Testcontainers e Flyway
@@ -69,6 +68,5 @@ adapters, concorrência e idempotência não são excluídos.
 ## Lacunas conhecidas
 
 * falta um teste end-to-end com Kafka real cobrindo producer, consumer, retry e DLT;
-* não há Maven Wrapper versionado;
 * o teste OpenAPI em contexto completo e a validação automatizada de todos os paths ainda não existem;
 * Outbox multi-worker e Inbox concorrente precisam de provas dedicadas além dos cenários atuais.

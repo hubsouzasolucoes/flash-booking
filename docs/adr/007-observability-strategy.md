@@ -1,4 +1,8 @@
-# ADR 007 — Local observability strategy
+# ADR-007: Local observability strategy
+
+## Status
+
+Accepted
 
 ## Context
 
@@ -21,7 +25,7 @@ Unique identifiers stay in logs rather than metric tags. A bounded Kafka metadat
 Correlation is explicit but does not provide cross-service spans or sampling. Deployment owners remain responsible for
 access control around Actuator endpoints when exposing the service outside a trusted local network.
 
-## Alternatives
+## Alternatives Considered
 
 A required Grafana/Prometheus/ELK/Loki stack was rejected as disproportionate local infrastructure. A SaaS agent was
 rejected because it creates credentials, cost, and vendor coupling. OpenTelemetry tracing was deferred until multiple
