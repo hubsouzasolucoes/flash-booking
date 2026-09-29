@@ -31,7 +31,7 @@ class ReservationUseCasesTest {
     void createsReservationOnlyAfterAtomicCapacityAcquisition() {
         UUID eventId = UUID.randomUUID();
         when(events.existsById(eventId)).thenReturn(true);
-        when(events.reserveCapacity(eventId, 2)).thenReturn(true);
+        when(events.reserveCapacity(eventId, 2)).thenReturn(Optional.of(new EventRepository.CapacityState(8, 2)));
         when(reservations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         Reservation result = useCases.create(eventId, 2, "request-1");

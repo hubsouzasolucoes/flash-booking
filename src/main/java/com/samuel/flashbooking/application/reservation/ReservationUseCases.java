@@ -2,6 +2,7 @@ package com.samuel.flashbooking.application.reservation;
 
 import com.samuel.flashbooking.application.ApplicationException;
 import com.samuel.flashbooking.application.DomainEventOutbox;
+import com.samuel.flashbooking.application.CorrelationIds;
 import com.samuel.flashbooking.application.event.EventRepository;
 import com.samuel.flashbooking.domain.reservation.Reservation;
 import com.samuel.flashbooking.domain.shared.DomainEvent;
@@ -57,14 +58,15 @@ public class ReservationUseCases {
         if (!events.existsById(eventId)) {
             throw new ApplicationException(EVENT_NOT_FOUND, "Event not found");
         }
-        if (!events.reserveCapacity(eventId, quantity)) {
+        var capacity = events.reserveCapacity(eventId, quantity);
+        if (capacity.isEmpty()) {
             throw new ApplicationException(INSUFFICIENT_CAPACITY, "Not enough tickets available");
         }
 
         Instant now = clock.instant();
         Reservation reservation = reservations.save(Reservation.create(eventId, quantity, now.plus(ttl), now));
         idempotency.save(key, requestHash, reservation.id(), now);
-        outbox.append(event("ReservationCreated", reservation, now));
+        outbox.append(event("ReservationCreated", reservation, capacity.orElseThrow(), now));
         return reservation;
     }
 
@@ -83,8 +85,8 @@ public class ReservationUseCases {
                     "Only pending reservations can be cancelled");
         }
         reservations.save(reservation);
-        events.releaseCapacity(reservation.eventId(), reservation.quantity());
-        outbox.append(event("ReservationCancelled", reservation, now));
+        var capacity = events.releaseCapacity(reservation.eventId(), reservation.quantity());
+        outbox.append(event("ReservationCancelled", reservation, capacity, now));
         return reservation;
     }
 
@@ -95,8 +97,8 @@ public class ReservationUseCases {
         for (Reservation reservation : reservations.findExpiredForUpdate(now, EXPIRATION_BATCH_SIZE)) {
             if (reservation.expire(now)) {
                 reservations.save(reservation);
-                events.releaseCapacity(reservation.eventId(), reservation.quantity());
-                outbox.append(event("ReservationExpired", reservation, now));
+                var capacity = events.releaseCapacity(reservation.eventId(), reservation.quantity());
+                outbox.append(event("ReservationExpired", reservation, capacity, now));
                 expired++;
             }
         }
@@ -108,10 +110,13 @@ public class ReservationUseCases {
                 .orElseThrow(() -> new ApplicationException(RESERVATION_NOT_FOUND, "Reservation not found"));
     }
 
-    private DomainEvent event(String type, Reservation reservation, Instant now) {
-        return new DomainEvent(reservation.id(), "Reservation", type,
+    private DomainEvent event(String type, Reservation reservation, EventRepository.CapacityState capacity, Instant now) {
+        UUID eventId = UUID.randomUUID();
+        return new DomainEvent(eventId, reservation.eventId(), "Event", capacity.version(), type, 1,
+                CorrelationIds.currentOrNew(), null,
                 Map.of("reservationId", reservation.id(), "eventId", reservation.eventId(),
-                        "quantity", reservation.quantity(), "status", reservation.status()), now);
+                        "quantity", reservation.quantity(), "status", reservation.status(),
+                        "availableTickets", capacity.availableTickets()), now);
     }
 
     private static String hash(String value) {

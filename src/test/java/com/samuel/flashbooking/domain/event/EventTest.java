@@ -15,6 +15,6 @@ class EventTest {
     @Test
     void rejectsInvalidAvailability() {
         assertThatIllegalArgumentException().isThrownBy(() -> new Event(java.util.UUID.randomUUID(), "Event",
-                Instant.now(), 10, 11, Instant.now()));
+                Instant.now(), 10, 11, 1, Instant.now()));
     }
 }
