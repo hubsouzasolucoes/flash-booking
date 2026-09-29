@@ -32,7 +32,8 @@ public class ReservationController {
             @ApiResponse(responseCode = "409", description = "Chave reutilizada com payload diferente"),
             @ApiResponse(responseCode = "422", description = "Capacidade insuficiente")})
     public Response create(@PathVariable UUID eventId, @Valid @RequestBody CreateRequest request,
-            @Parameter(description = "Chave única do request (máximo de 160 caracteres)", required = true,
+            @Parameter(description = "Chave única da operação (máximo de 160 caracteres). Retry com o mesmo evento e " +
+                    "quantidade retorna a reserva original; reutilização com payload diferente retorna 409.", required = true,
                     example = "checkout-123-attempt-1")
             @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 160) String key) {
         return response(reservations.create(eventId, request.quantity(), key));
@@ -45,8 +46,9 @@ public class ReservationController {
     public Response get(@PathVariable UUID id) { return response(reservations.get(id)); }
 
     @DeleteMapping("/reservations/{id}")
-    @Operation(summary = "Cancelar reserva pendente", responses = {
-            @ApiResponse(responseCode = "200", description = "Reserva cancelada"),
+    @Operation(summary = "Cancelar reserva pendente", description = "Operação idempotente: retries de uma reserva já " +
+            "cancelada retornam o mesmo estado sem devolver capacidade novamente.", responses = {
+            @ApiResponse(responseCode = "200", description = "Reserva cancelada ou cancelamento anterior recuperado"),
             @ApiResponse(responseCode = "404", description = "Reserva inexistente"),
             @ApiResponse(responseCode = "409", description = "Reserva não está pendente")})
     public Response cancel(@PathVariable UUID id) { return response(reservations.cancel(id)); }

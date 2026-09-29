@@ -5,17 +5,17 @@ import com.samuel.flashbooking.application.DomainEventOutbox;
 import com.samuel.flashbooking.application.CorrelationIds;
 import com.samuel.flashbooking.application.event.EventRepository;
 import com.samuel.flashbooking.domain.reservation.Reservation;
+import com.samuel.flashbooking.domain.reservation.ReservationStatus;
 import com.samuel.flashbooking.domain.shared.DomainEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,21 +30,31 @@ public class ReservationUseCases {
     private final DomainEventOutbox outbox;
     private final Clock clock;
     private final Duration ttl;
+    private final Counter created;
+    private final Counter capacityRejected;
+    private final Counter replayed;
+    private final Counter cancelled;
+    private final Counter expiredCounter;
 
     public ReservationUseCases(EventRepository events, ReservationRepository reservations,
             IdempotencyStore idempotency, DomainEventOutbox outbox, Clock clock,
-            @Value("${app.reservation-ttl}") Duration ttl) {
+            @Value("${app.reservation-ttl}") Duration ttl, MeterRegistry metrics) {
         this.events = events;
         this.reservations = reservations;
         this.idempotency = idempotency;
         this.outbox = outbox;
         this.clock = clock;
         this.ttl = ttl;
+        this.created = metrics.counter("reservation.created");
+        this.capacityRejected = metrics.counter("reservation.rejected.capacity");
+        this.replayed = metrics.counter("reservation.idempotent.replay");
+        this.cancelled = metrics.counter("reservation.cancelled");
+        this.expiredCounter = metrics.counter("reservation.expired");
     }
 
     @Transactional
     public Reservation create(UUID eventId, int quantity, String key) {
-        String requestHash = hash(eventId + ":" + quantity);
+        String requestHash = RequestFingerprint.reservation(eventId, quantity);
         // A PostgreSQL transaction-scoped advisory lock serializes one key across every API instance.
         idempotency.lock(key);
         var previous = idempotency.find(key);
@@ -53,6 +63,7 @@ public class ReservationUseCases {
                 throw new ApplicationException(IDEMPOTENCY_CONFLICT,
                         "Idempotency key was already used with a different request");
             }
+            replayed.increment();
             return getRequired(previous.get().reservationId());
         }
         if (!events.existsById(eventId)) {
@@ -60,6 +71,7 @@ public class ReservationUseCases {
         }
         var capacity = events.reserveCapacity(eventId, quantity);
         if (capacity.isEmpty()) {
+            capacityRejected.increment();
             throw new ApplicationException(INSUFFICIENT_CAPACITY, "Not enough tickets available");
         }
 
@@ -67,6 +79,7 @@ public class ReservationUseCases {
         Reservation reservation = reservations.save(Reservation.create(eventId, quantity, now.plus(ttl), now));
         idempotency.save(key, requestHash, reservation.id(), now);
         outbox.append(event("ReservationCreated", reservation, capacity.orElseThrow(), now));
+        created.increment();
         return reservation;
     }
 
@@ -80,6 +93,9 @@ public class ReservationUseCases {
         Reservation reservation = reservations.findByIdForUpdate(id)
                 .orElseThrow(() -> new ApplicationException(RESERVATION_NOT_FOUND, "Reservation not found"));
         Instant now = clock.instant();
+        if (reservation.status() == ReservationStatus.CANCELLED) {
+            return reservation; // DELETE retry: the first transaction already released capacity.
+        }
         if (!reservation.cancel(now)) {
             throw new ApplicationException(RESERVATION_NOT_CANCELLABLE,
                     "Only pending reservations can be cancelled");
@@ -87,6 +103,7 @@ public class ReservationUseCases {
         reservations.save(reservation);
         var capacity = events.releaseCapacity(reservation.eventId(), reservation.quantity());
         outbox.append(event("ReservationCancelled", reservation, capacity, now));
+        cancelled.increment();
         return reservation;
     }
 
@@ -99,6 +116,7 @@ public class ReservationUseCases {
                 reservations.save(reservation);
                 var capacity = events.releaseCapacity(reservation.eventId(), reservation.quantity());
                 outbox.append(event("ReservationExpired", reservation, capacity, now));
+                expiredCounter.increment();
                 expired++;
             }
         }
@@ -119,12 +137,4 @@ public class ReservationUseCases {
                         "availableTickets", capacity.availableTickets()), now);
     }
 
-    private static String hash(String value) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is required by the Java platform", exception);
-        }
-    }
 }
