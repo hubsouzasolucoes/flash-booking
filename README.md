@@ -70,9 +70,8 @@ docker compose up --build
 Compose starts PostgreSQL, Kafka, one or more application replicas, and an Nginx entry point. Health checks order
 startup;
 Flyway migrates an empty database and Spring creates the Kafka topics. Local-only defaults are `flash/flash` for the
-PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5432`, and Kafka `9092` (the
-last
-two are exposed for optional development/debugging).
+PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5432` by default (configurable
+with `POSTGRES_PORT`), and Kafka `9092`; the last two are exposed for optional development/debugging.
 
 ```bash
 docker compose down       # keep PostgreSQL volume
@@ -95,7 +94,9 @@ docker compose up -d postgres kafka
 
 The application's defaults match Compose: database `flash_booking`, user/password `flash/flash`, PostgreSQL on
 `localhost:5432`, and Kafka on `localhost:9092`. An IDE run configuration therefore does not need environment variables
-unless those defaults have been overridden.
+unless those defaults have been overridden. The Compose health check performs an authenticated query (rather than only
+checking whether a PostgreSQL server is listening), so an old or incorrectly initialized database is reported as
+unhealthy before the application starts.
 
 If startup reports `FATAL: role "flash" does not exist`, PostgreSQL is reachable, but the server listening on port
 `5432` was not initialized with this project's credentials. First verify that the project container is running and
@@ -116,9 +117,19 @@ docker compose down -v
 docker compose up -d postgres kafka
 ```
 
-This deletes the local PostgreSQL data. If it must be preserved, create the `flash` login/database with an existing
+This deletes the local PostgreSQL data. The Compose volume is versioned as `postgres_data_v1`, ensuring installations
+that used an older project volume get a clean initialization with the documented credentials. If the data must be
+preserved, create the `flash` login/database with an existing
 PostgreSQL administrator or set `DB_URL`, `DB_USER`, and `DB_PASSWORD` in the IDE to credentials already present in that
 database instead of removing the volume.
+
+If another PostgreSQL installation already owns host port `5432`, publish this project's database on a different port
+and give the host-run application the matching JDBC URL:
+
+```bash
+POSTGRES_PORT=5433 docker compose up -d postgres kafka
+DB_URL=jdbc:postgresql://localhost:5433/flash_booking ./mvnw spring-boot:run
+```
 
 ## API / Swagger
 
