@@ -82,6 +82,44 @@ docker compose down -v    # also delete local data
 No `.env` file is required. Runtime overrides include `DB_*`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_EVENTS_TOPIC`,
 `RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS`, and `SERVER_PORT`.
 
+### Running the application from the IDE
+
+When the Spring Boot application runs on the host (for example, from IntelliJ), start only its infrastructure
+dependencies. Starting the complete Compose stack also starts another application instance and reserves host port
+`8080` for Nginx.
+
+```bash
+docker compose up -d postgres kafka
+./mvnw spring-boot:run
+```
+
+The application's defaults match Compose: database `flash_booking`, user/password `flash/flash`, PostgreSQL on
+`localhost:5432`, and Kafka on `localhost:9092`. An IDE run configuration therefore does not need environment variables
+unless those defaults have been overridden.
+
+If startup reports `FATAL: role "flash" does not exist`, PostgreSQL is reachable, but the server listening on port
+`5432` was not initialized with this project's credentials. First verify that the project container is running and
+publishing the expected port, then inspect its initialization log:
+
+```bash
+docker compose ps postgres
+docker compose port postgres 5432
+docker compose logs postgres
+```
+
+The official PostgreSQL image applies `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` only when it initializes an
+empty data directory. Consequently, a named volume created with older credentials is not changed by restarting the
+container. For disposable local data, recreate that volume and start the infrastructure again:
+
+```bash
+docker compose down -v
+docker compose up -d postgres kafka
+```
+
+This deletes the local PostgreSQL data. If it must be preserved, create the `flash` login/database with an existing
+PostgreSQL administrator or set `DB_URL`, `DB_USER`, and `DB_PASSWORD` in the IDE to credentials already present in that
+database instead of removing the volume.
+
 ## API / Swagger
 
 - API: <http://localhost:8080>
