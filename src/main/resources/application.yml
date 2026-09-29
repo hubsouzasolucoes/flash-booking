@@ -1,23 +1,36 @@
 spring:
-  application.name: flash-booking
+  application:
+    name: flash-booking
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/flash_booking}
     username: ${DB_USER:flash}
     password: ${DB_PASSWORD:flash}
   jpa:
     open-in-view: false
-    hibernate.ddl-auto: validate
+    hibernate:
+      ddl-auto: validate
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 springdoc:
-  swagger-ui.path: /swagger-ui.html
-management.endpoints.web.exposure.include: health,info,metrics
+  swagger-ui:
+    path: /swagger-ui.html
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
 app:
-  reservation-ttl: PT10M
-  outbox-fixed-delay: 1000
-  expiration-fixed-delay: 5000
+  reservation-ttl: ${RESERVATION_TTL:PT10M}
+  outbox-fixed-delay: ${OUTBOX_FIXED_DELAY_MS:1000}
+  expiration-fixed-delay: ${EXPIRATION_FIXED_DELAY_MS:5000}
+  kafka:
+    events-topic: ${KAFKA_EVENTS_TOPIC:flash-booking.events}
