@@ -44,10 +44,26 @@ converge sem participar da proteção de capacidade.
 ## Teste multi-instance
 
 Execute `docker compose up --build --scale app=3`. O Nginx em `localhost:8080` distribui chamadas às réplicas, que usam o
-mesmo PostgreSQL. Crie um evento e execute `EVENT_ID=<uuid> k6 run load-tests/flash-sale.js`. O script considera 422 por
+mesmo PostgreSQL. Crie um evento e execute `EVENT_ID=<uuid> docker compose --profile load-test run --rm k6`. O script considera 422 por
 esgotamento um resultado de negócio; valide a correção pela suíte Testcontainers e pelo estado persistido, não pelo k6.
 
-`ReservationConcurrencyIntegrationTest` não sobe aplicações completas: ele exercita os mesmos beans transacionais por
+`ReservationConcurrencyIT` não sobe aplicações completas: ele exercita os mesmos beans transacionais por
 threads, conexões e transações independentes contra PostgreSQL real. Seus cenários cobrem 100 compradores, quantidades
 variáveis, 50 retries da mesma chave, cancelamento, múltiplos expiradores, cancelamento versus expiração, expiração versus
 novas reservas, rollback e Inbox/projeção duplicada. A demonstração de três processos completos é o Compose acima.
+
+## Contention model
+
+```mermaid
+flowchart LR
+  A[Request A] --> U[Atomic conditional UPDATE<br/>on one event row]
+  B[Request B] --> U
+  C[Request C] --> U
+  U --> W[Enough capacity: commit]
+  U --> L[Sold out: 422, no mutation]
+```
+
+A single hot event can funnel tens of thousands of requests into the same row. Multiple JVMs improve HTTP throughput but
+do not remove that serialization point. The current design intentionally chooses correctness and operational simplicity.
+At much larger scale, partitioned ownership, admission control/waiting rooms, backpressure, or sharding by event could
+bound contention; these require a different operational model and are not claimed here.

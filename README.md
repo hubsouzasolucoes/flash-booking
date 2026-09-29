@@ -1,94 +1,153 @@
 # Flash Booking
 
-API de reserva de ingressos para flash sales, implementada com Java 21, Spring Boot, PostgreSQL, Kafka, Flyway e
-Transactional Outbox, Inbox e uma projeção CQRS de disponibilidade. O write model relacional é a fonte autoritativa;
-Kafka transporta eventos com entrega **at-least-once** e não há dependência de cloud.
+## Overview
 
-## Executar do zero
+Flash Booking is the transactional core of a limited-capacity ticket platform. During a flash sale, many application
+instances may compete for the same event; PostgreSQL remains the authority and an atomic conditional update prevents
+overselling. Reservation commands are strongly consistent, while event availability is a deliberately eventually
+consistent projection fed through a transactional Outbox, Kafka and an idempotent Inbox consumer.
 
-Pré-requisitos: Git, Java 21 e Docker com Docker Compose. Para subir aplicação e toda a infraestrutura local:
+The demonstration is entirely local: no cloud account, remote database, managed Kafka, SaaS, or external secret manager
+is required.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  C[Client] --> N[Nginx :8080]
+  N --> A[REST / Application / Domain]
+  A -->|one transaction| P[(PostgreSQL<br/>business state + Outbox)]
+  P --> O[Outbox publisher]
+  O --> K[Kafka]
+  K --> I[Inbox consumer]
+  I --> R[(Availability projection)]
+  R --> A
+```
+
+The code follows pragmatic hexagonal boundaries: HTTP and persistence/messaging are adapters around application ports
+and domain objects. CQRS is applied specifically to event availability; reservation lookup still reads its transactional
+table. This is event-driven state propagation, **not Event Sourcing**.
+
+## Technology Stack
+
+- **Java 21 / Spring Boot 3** — application and HTTP runtime.
+- **PostgreSQL 17** — authoritative capacity, reservations, idempotency, Outbox, Inbox, and projection storage.
+- **Kafka (KRaft)** — local asynchronous event transport with at-least-once delivery.
+- **Flyway** — automatic schema creation and evolution.
+- **Springdoc OpenAPI / Swagger UI** — interactive API contract.
+- **Actuator, Micrometer, Prometheus registry** — health and metrics endpoints.
+- **Testcontainers, JUnit, ArchUnit, JaCoCo** — integration, concurrency, architecture, and coverage validation.
+- **k6** — optional containerized flash-sale load scenario.
+
+## Key Engineering Decisions
+
+- **Zero oversell:** `UPDATE events ... WHERE available_tickets >= ?` is atomic; database constraints are the final guard.
+- **Idempotency:** a transaction-scoped PostgreSQL advisory lock and persistent unique key serialize same-key races across
+  instances; same payload replays the original result and a changed payload returns `409`.
+- **Transactional Outbox:** business state and a versioned event envelope commit together, avoiding a database/Kafka
+  dual-write window.
+- **At-least-once Kafka + Inbox:** duplicates can occur between broker acknowledgement and Outbox completion; the consumer
+  deduplicates `(event_id, consumer)` in the projection transaction.
+- **CQRS for availability:** `GET /events/{id}` reads an asynchronous projection. Kafka never decides whether a ticket is sold.
+- **Single-winner terminal transitions:** row locks and `SKIP LOCKED` coordinate cancellation and expiration workers.
+
+See the [ADRs](docs/adr/) and [architecture detail](docs/architecture.md).
+
+## Running Locally
+
+Prerequisite: Docker with Docker Compose (Git is needed only to clone). Java, Maven, PostgreSQL, Kafka, and k6 do not need
+to be installed for the main path.
 
 ```bash
 docker compose up --build
 ```
 
-- API: `http://localhost:8080`
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
-- OpenAPI: `http://localhost:8080/v3/api-docs`
-- Health: `http://localhost:8080/actuator/health`
-
-Para remover também os dados locais: `docker compose down -v`.
-
-## Endpoints
-
-- `POST /events`
-- `GET /events/{id}`
-- `POST /events/{id}/reservations` (`Idempotency-Key`, de 1 a 160 caracteres, obrigatório)
-- `GET /reservations/{id}`
-- `DELETE /reservations/{id}`
-
-Exemplo:
+Compose starts PostgreSQL, Kafka, one or more application replicas, and an Nginx entry point. Health checks order startup;
+Flyway migrates an empty database and Spring creates the Kafka topics. Local-only defaults are `flash/flash` for the
+PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5432`, and Kafka `9092` (the last
+two are exposed for optional development/debugging).
 
 ```bash
-curl -X POST http://localhost:8080/events \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Java Conference","startsAt":"2027-10-01T18:00:00Z","capacity":100}'
-
-curl -X POST http://localhost:8080/events/SEU_EVENT_ID/reservations \
-  -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: checkout-123-attempt-1' \
-  -d '{"quantity":2}'
+docker compose down       # keep PostgreSQL volume
+docker compose down -v    # also delete local data
 ```
 
-## Desenvolvimento
+No `.env` file is required. Runtime overrides include `DB_*`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_EVENTS_TOPIC`,
+`RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS`, and `SERVER_PORT`.
 
-Com PostgreSQL e Kafka acessíveis nas portas padrão (o próprio Compose os expõe):
+## API / Swagger
+
+- API: <http://localhost:8080>
+- Swagger UI: <http://localhost:8080/swagger-ui.html>
+- OpenAPI JSON: <http://localhost:8080/v3/api-docs>
+
+The public contract consists of `POST /events`, `GET /events/{id}`, `POST /events/{id}/reservations`,
+`GET /reservations/{id}`, and `DELETE /reservations/{id}`. Reservation creation requires `Idempotency-Key` (1–160 chars).
+Errors use `application/problem+json` `ProblemDetail` documents.
+
+## Example Flow
 
 ```bash
-mvn test          # suíte rápida: unidade, API isolada e arquitetura
-mvn clean verify  # quality gate completo, incluindo Testcontainers e JaCoCo
-mvn spring-boot:run
+./scripts/demo.sh
+./scripts/demo-idempotency.sh
+./scripts/demo-concurrency.sh
 ```
 
-Configurações variáveis aceitam `DB_URL`, `DB_USER`, `DB_PASSWORD`, `DB_MAX_POOL_SIZE`, `DB_MIN_IDLE`,
-`DB_CONNECTION_TIMEOUT_MS`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_EVENTS_TOPIC`,
-`RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS` e `SERVER_PORT`.
-
-`GET /events/{id}` lê `event_availability_projection`: logo após um comando ele pode retornar a versão anterior (ou 404
-durante a criação) até Outbox → Kafka → Inbox convergir. A concessão de ingressos nunca consulta essa projeção; ela usa
-um `UPDATE` condicional no PostgreSQL. Para acompanhar o fluxo, use `docker compose logs -f app` e procure por
-`outbox event created`, `outbox event published`, `projection updated` e `duplicate ignored`. Métricas ficam em
-`/actuator/metrics`.
-
-A arquitetura está em [`docs/architecture.md`](docs/architecture.md), com detalhes em
-[`docs/event-driven-architecture.md`](docs/event-driven-architecture.md). O diretório
-`load-tests` contém um cenário k6 opcional para concorrência.
-
-## Observability
-
-The local operational surface is intentionally small: [health](http://localhost:8080/actuator/health),
-[liveness](http://localhost:8080/actuator/health/liveness),
-[readiness](http://localhost:8080/actuator/health/readiness),
-[metrics](http://localhost:8080/actuator/metrics), and
-[Prometheus exposition](http://localhost:8080/actuator/prometheus). API discovery is available through
-[Swagger UI](http://localhost:8080/swagger-ui.html) and [OpenAPI JSON](http://localhost:8080/v3/api-docs).
-
-Clients may send a UUID in `X-Correlation-Id`; otherwise the API generates one. The value is returned in every response
-and included in error bodies and asynchronous domain-event envelopes. See
-[`docs/observability.md`](docs/observability.md) for metric names, log fields, health semantics, and troubleshooting.
+The scripts use POSIX shell, `curl`, and standard text utilities; IDs are created dynamically. `demo.sh` waits for
+readiness, creates and queries an event, reserves, replays the same key, observes projected availability, cancels, and
+observes the final state.
 
 ## Testing
 
-`mvn test` executa a pirâmide rápida; `mvn clean verify` acrescenta integração e concorrência reais com PostgreSQL,
-as migrations Flyway e gera `target/site/jacoco/index.html`. Docker precisa estar disponível para a suíte completa.
-A estratégia, os invariantes cobertos e o comando de carga via Compose estão em [`docs/testing.md`](docs/testing.md).
+For development outside containers, use Java 21; the committed wrapper downloads Maven 3.9.11 on first use:
 
-## Concurrency & Consistency
+```bash
+./mvnw clean test    # unit, application, API, messaging unit, and ArchUnit tests
+./mvnw clean verify  # also Testcontainers integration/concurrency tests and JaCoCo report
+```
 
-O PostgreSQL impede overselling por update condicional atômico e constraints. Advisory locks transacionais mais a chave
-única tornam `Idempotency-Key` segura entre instâncias; locks de linha tornam cancelamento e expiração single-winner. O
-read model é eventualmente consistente e nunca concede capacidade. Detalhes e semântica HTTP estão em
-[`docs/concurrency.md`](docs/concurrency.md).
+The full suite needs a Docker daemon for Testcontainers. Details: [docs/testing.md](docs/testing.md).
 
-Para uma demonstração balanceada: `docker compose up --build --scale app=3`. Depois de criar o evento, execute
-`EVENT_ID=<uuid> k6 run load-tests/flash-sale.js`. Respostas 422 representam esgotamento esperado, não erro técnico.
+## Load Testing and Multiple Instances
+
+```bash
+docker compose up --build --scale app=3
+EVENT_ID=<uuid> VUS=100 DURATION=30s QUANTITY=1 docker compose --profile load-test run --rm k6
+```
+
+Nginx keeps one stable host port while Docker DNS discovers scaled `app` replicas. k6 treats `422` sellout responses as
+business outcomes, not technical failures; it is a load demonstration, not the correctness proof.
+
+## Observability
+
+- Health: <http://localhost:8080/actuator/health>
+- Liveness: <http://localhost:8080/actuator/health/liveness>
+- Readiness: <http://localhost:8080/actuator/health/readiness>
+- Metrics catalog: <http://localhost:8080/actuator/metrics>
+- Prometheus exposition: <http://localhost:8080/actuator/prometheus>
+
+Clients may supply a UUID `X-Correlation-Id`; otherwise one is generated, returned, logged, and propagated in domain
+events. See [docs/observability.md](docs/observability.md).
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Event-driven flow](docs/event-driven-architecture.md)
+- [Concurrency](docs/concurrency.md)
+- [Business rules](docs/business-rules.md)
+- [Testing](docs/testing.md)
+- [Observability](docs/observability.md)
+- [Code review guide](docs/code-review-guide.md)
+- [Architecture Decision Records](docs/adr/)
+
+## Trade-offs
+
+PostgreSQL correctness is simple and strong but a single extremely popular event becomes a hot row. Transactional Outbox
+removes dual-write loss at the cost of polling and asynchronous visibility. At-least-once transport is practical but
+requires Inbox idempotency. The availability projection decouples query work but may briefly return an old value or `404`.
+
+## Future Improvements
+
+At substantially larger scale, evaluate partitioned event ownership or sharding, CDC/Debezium instead of Outbox polling,
+a dedicated read store, schema governance, backpressure and a waiting room, rate limiting, autoscaling, distributed
+tracing, and history retention/partitioning. Authentication and payment workflow are intentionally outside this case.

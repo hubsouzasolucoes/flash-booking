@@ -1,4 +1,8 @@
-# ADR 003 — Kafka at-least-once
+# ADR-003: Kafka at-least-once
+
+## Status
+
+Accepted
 
 ## Context
 Não existe commit atômico entre o broker, Outbox e offset do consumer.
@@ -9,5 +13,5 @@ Usar `booking.domain-events`, key `aggregateId`, producer idempotente com `acks=
 ## Consequences
 Há ordem por agregado e duplicatas são normais. Exactly-once end-to-end não é prometido.
 
-## Alternatives considered
+## Alternatives Considered
 Key aleatória perderia ordenação; Schema Registry e Kafka transactions não eliminariam atomicidade com PostgreSQL.

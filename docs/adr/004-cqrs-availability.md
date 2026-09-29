@@ -1,4 +1,8 @@
-# ADR 004 — CQRS somente para disponibilidade
+# ADR-004: CQRS somente para disponibilidade
+
+## Status
+
+Accepted
 
 ## Context
 A consulta de disponibilidade é quente, mas não pode enfraquecer zero overselling.
@@ -9,5 +13,5 @@ A consulta de disponibilidade é quente, mas não pode enfraquecer zero oversell
 ## Consequences
 Leitura escala e pode estar atrasada. Inbox e versão impedem duplicação/regressão.
 
-## Alternatives considered
+## Alternatives Considered
 Usar a projeção para conceder ingressos foi rejeitado; duplicar todo o modelo também.
