@@ -1,11 +1,12 @@
 package com.samuel.flashbooking.controller;
 
-import com.samuel.flashbooking.dto.ApiDtos.*;
+import com.samuel.flashbooking.dto.ApiDtos.CreateReservationRequest;
+import com.samuel.flashbooking.dto.ApiDtos.ReservationResponse;
 import com.samuel.flashbooking.service.ReservationService;
-import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;

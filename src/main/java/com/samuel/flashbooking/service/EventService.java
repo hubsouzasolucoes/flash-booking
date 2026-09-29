@@ -1,16 +1,20 @@
 package com.samuel.flashbooking.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.samuel.flashbooking.domain.*;
-import com.samuel.flashbooking.dto.ApiDtos.*;
+import com.samuel.flashbooking.domain.Event;
+import com.samuel.flashbooking.domain.OutboxEvent;
+import com.samuel.flashbooking.dto.ApiDtos.CreateEventRequest;
+import com.samuel.flashbooking.dto.ApiDtos.EventResponse;
 import com.samuel.flashbooking.exception.BusinessException;
-import com.samuel.flashbooking.repository.*;
+import com.samuel.flashbooking.repository.EventRepository;
+import com.samuel.flashbooking.repository.OutboxRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class EventService {

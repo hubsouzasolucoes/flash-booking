@@ -1,10 +1,17 @@
 package com.samuel.flashbooking.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.samuel.flashbooking.domain.*;
-import com.samuel.flashbooking.dto.ApiDtos.*;
+import com.samuel.flashbooking.domain.IdempotencyRecord;
+import com.samuel.flashbooking.domain.OutboxEvent;
+import com.samuel.flashbooking.domain.Reservation;
+import com.samuel.flashbooking.domain.ReservationStatus;
+import com.samuel.flashbooking.dto.ApiDtos.CreateReservationRequest;
+import com.samuel.flashbooking.dto.ApiDtos.ReservationResponse;
 import com.samuel.flashbooking.exception.BusinessException;
-import com.samuel.flashbooking.repository.*;
+import com.samuel.flashbooking.repository.EventRepository;
+import com.samuel.flashbooking.repository.IdempotencyRepository;
+import com.samuel.flashbooking.repository.OutboxRepository;
+import com.samuel.flashbooking.repository.ReservationRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -13,8 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.*;
-import java.util.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class ReservationService {
