@@ -7,11 +7,12 @@ import com.samuel.flashbooking.domain.shared.DomainEvent;
 import com.samuel.flashbooking.infrastructure.persistence.entity.OutboxEventEntity;
 import com.samuel.flashbooking.infrastructure.persistence.repository.JpaOutboxRepository;
 import org.springframework.stereotype.Component;
-import java.util.LinkedHashMap;
-import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class JpaDomainEventOutbox implements DomainEventOutbox {
+    private static final Logger log = LoggerFactory.getLogger(JpaDomainEventOutbox.class);
     private final JpaOutboxRepository repository;
     private final ObjectMapper objectMapper;
     public JpaDomainEventOutbox(JpaOutboxRepository repository, ObjectMapper objectMapper) {
@@ -20,17 +21,12 @@ public class JpaDomainEventOutbox implements DomainEventOutbox {
 
     @Override
     public void append(DomainEvent event) {
-        var envelope = new LinkedHashMap<String, Object>();
-        envelope.put("eventId", UUID.randomUUID());
-        envelope.put("aggregateId", event.aggregateId());
-        envelope.put("aggregateType", event.aggregateType());
-        envelope.put("eventType", event.eventType());
-        envelope.put("occurredAt", event.occurredAt());
-        envelope.put("data", event.data());
         try {
-            repository.save(new OutboxEventEntity((UUID) envelope.get("eventId"), event.aggregateId(),
-                    event.aggregateType(), event.eventType(), objectMapper.writeValueAsString(envelope),
+            repository.save(new OutboxEventEntity(event.eventId(), event.aggregateId(),
+                    event.aggregateType(), event.aggregateVersion(), event.eventType(), event.eventVersion(), objectMapper.writeValueAsString(event),
                     event.occurredAt()));
+            log.info("outbox event created eventId={} aggregateId={} eventType={} correlationId={}",
+                    event.eventId(), event.aggregateId(), event.eventType(), event.correlationId());
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Could not serialize domain event", exception);
         }

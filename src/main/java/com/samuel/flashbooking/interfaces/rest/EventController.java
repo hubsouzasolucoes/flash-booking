@@ -32,7 +32,11 @@ public class EventController {
     @Operation(summary = "Consultar evento e disponibilidade", responses = {
             @ApiResponse(responseCode = "200", description = "Evento encontrado"),
             @ApiResponse(responseCode = "404", description = "Evento inexistente")})
-    public Response get(@PathVariable UUID id) { return response(events.get(id)); }
+    public Response get(@PathVariable UUID id) {
+        var event = events.getAvailability(id);
+        return new Response(event.id(), event.name(), event.startsAt(), event.capacity(),
+                event.availableTickets(), event.createdAt());
+    }
 
     private Response response(Event event) {
         return new Response(event.id(), event.name(), event.startsAt(), event.capacity(),
