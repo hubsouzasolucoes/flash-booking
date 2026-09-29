@@ -18,3 +18,6 @@ Esta fase escolhe estado relacional autoritativo e eventos de domínio, **sem Ev
 
 Detalhes operacionais, garantias e recuperação estão em [event-driven-architecture.md](event-driven-architecture.md), e
 as decisões resumidas em [adr](adr/).
+
+Os mecanismos e provas para concorrência estão detalhados em [concurrency.md](concurrency.md) e no
+[ADR 006](adr/006-concurrency-control.md).

@@ -50,7 +50,8 @@ mvn clean verify
 mvn spring-boot:run
 ```
 
-Configurações variáveis aceitam `DB_URL`, `DB_USER`, `DB_PASSWORD`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_EVENTS_TOPIC`,
+Configurações variáveis aceitam `DB_URL`, `DB_USER`, `DB_PASSWORD`, `DB_MAX_POOL_SIZE`, `DB_MIN_IDLE`,
+`DB_CONNECTION_TIMEOUT_MS`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_EVENTS_TOPIC`,
 `RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS` e `SERVER_PORT`.
 
 `GET /events/{id}` lê `event_availability_projection`: logo após um comando ele pode retornar a versão anterior (ou 404
@@ -62,3 +63,13 @@ um `UPDATE` condicional no PostgreSQL. Para acompanhar o fluxo, use `docker comp
 A arquitetura está em [`docs/architecture.md`](docs/architecture.md), com detalhes em
 [`docs/event-driven-architecture.md`](docs/event-driven-architecture.md). O diretório
 `load-tests` contém um cenário k6 opcional para concorrência.
+
+## Concurrency & Consistency
+
+O PostgreSQL impede overselling por update condicional atômico e constraints. Advisory locks transacionais mais a chave
+única tornam `Idempotency-Key` segura entre instâncias; locks de linha tornam cancelamento e expiração single-winner. O
+read model é eventualmente consistente e nunca concede capacidade. Detalhes e semântica HTTP estão em
+[`docs/concurrency.md`](docs/concurrency.md).
+
+Para uma demonstração balanceada: `docker compose up --build --scale app=3`. Depois de criar o evento, execute
+`EVENT_ID=<uuid> k6 run load-tests/flash-sale.js`. Respostas 422 representam esgotamento esperado, não erro técnico.

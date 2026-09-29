@@ -4,6 +4,7 @@ import com.samuel.flashbooking.application.ApplicationException;
 import com.samuel.flashbooking.application.DomainEventOutbox;
 import com.samuel.flashbooking.application.event.EventRepository;
 import com.samuel.flashbooking.domain.reservation.Reservation;
+import com.samuel.flashbooking.domain.reservation.ReservationStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.time.*;
@@ -12,6 +13,7 @@ import java.util.UUID;
 import static com.samuel.flashbooking.application.ApplicationException.ErrorCode.IDEMPOTENCY_CONFLICT;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class ReservationUseCasesTest {
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
@@ -24,7 +26,7 @@ class ReservationUseCasesTest {
     @BeforeEach
     void setUp() {
         useCases = new ReservationUseCases(events, reservations, idempotency, outbox,
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(10));
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(10), new SimpleMeterRegistry());
     }
 
     @Test
@@ -48,7 +50,7 @@ class ReservationUseCasesTest {
         UUID eventId = UUID.randomUUID();
         Reservation original = Reservation.create(eventId, 2, NOW.plusSeconds(600), NOW);
         when(idempotency.find("request-1")).thenReturn(Optional.of(
-                new IdempotencyStore.Record(hash(eventId + ":2"), original.id())));
+                new IdempotencyStore.Record(RequestFingerprint.reservation(eventId, 2), original.id())));
         when(reservations.findById(original.id())).thenReturn(Optional.of(original));
 
         assertThat(useCases.create(eventId, 2, "request-1")).isSameAs(original);
@@ -67,12 +69,16 @@ class ReservationUseCasesTest {
         verify(events, never()).reserveCapacity(any(), anyInt());
     }
 
-    private String hash(String value) {
-        try {
-            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new AssertionError(exception);
-        }
+    @Test
+    void cancellationRetryDoesNotReleaseCapacityOrEmitAgain() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = Reservation.create(UUID.randomUUID(), 2, NOW.plusSeconds(600), NOW);
+        reservation.cancel(NOW);
+        when(reservations.findByIdForUpdate(id)).thenReturn(Optional.of(reservation));
+
+        assertThat(useCases.cancel(id).status()).isEqualTo(ReservationStatus.CANCELLED);
+        verify(events, never()).releaseCapacity(any(), anyInt());
+        verify(outbox, never()).append(any());
     }
+
 }
