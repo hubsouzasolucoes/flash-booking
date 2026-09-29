@@ -12,8 +12,10 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
 import java.net.URI;
 import java.util.List;
+
 import com.samuel.flashbooking.application.CorrelationIds;
 
 @RestControllerAdvice
@@ -60,5 +62,6 @@ public class ApiExceptionHandler {
         return problem;
     }
 
-    public record FieldError(String field, String message) {}
+    public record FieldError(String field, String message) {
+    }
 }

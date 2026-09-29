@@ -21,7 +21,8 @@ an expired reservation returns a conflict. Cancellation and expiration each rest
 
 ## Idempotency
 
-`POST /events/{id}/reservations` requires an `Idempotency-Key` no longer than 160 characters. The semantic fingerprint is
+`POST /events/{id}/reservations` requires an `Idempotency-Key` no longer than 160 characters. The semantic fingerprint
+is
 `eventId + quantity`. Reusing a key with the same fingerprint returns the original reservation; reuse with a different
 fingerprint returns HTTP 409. Records are persistent and shared by every instance.
 

@@ -7,12 +7,15 @@ import com.samuel.flashbooking.domain.reservation.Reservation;
 import com.samuel.flashbooking.domain.reservation.ReservationStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import java.time.*;
 import java.util.Optional;
 import java.util.UUID;
+
 import static com.samuel.flashbooking.application.ApplicationException.ErrorCode.IDEMPOTENCY_CONFLICT;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class ReservationUseCasesTest {

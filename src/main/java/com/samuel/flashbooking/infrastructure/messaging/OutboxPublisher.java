@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
 import java.time.Clock;
 import java.time.Duration;
 
@@ -24,7 +25,10 @@ public class OutboxPublisher {
 
     public OutboxPublisher(OutboxClaims claims, KafkaTemplate<String, String> kafka, Clock clock,
                            MeterRegistry metrics, @Value("${app.kafka.events-topic}") String topic) {
-        this.claims = claims; this.kafka = kafka; this.clock = clock; this.topic = topic;
+        this.claims = claims;
+        this.kafka = kafka;
+        this.clock = clock;
+        this.topic = topic;
         this.success = metrics.counter("booking.outbox.published");
         this.failure = metrics.counter("booking.outbox.failed");
         this.retry = metrics.counter("booking.outbox.retry");

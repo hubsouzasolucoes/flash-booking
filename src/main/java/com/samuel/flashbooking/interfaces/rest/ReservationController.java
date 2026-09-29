@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.UUID;
 
 @RestController
@@ -21,7 +22,10 @@ import java.util.UUID;
 @Tag(name = "Reservations", description = "Ciclo de vida das reservas")
 public class ReservationController {
     private final ReservationUseCases reservations;
-    public ReservationController(ReservationUseCases reservations) { this.reservations = reservations; }
+
+    public ReservationController(ReservationUseCases reservations) {
+        this.reservations = reservations;
+    }
 
     @PostMapping("/events/{eventId}/reservations")
     @ResponseStatus(HttpStatus.CREATED)
@@ -33,10 +37,10 @@ public class ReservationController {
             @ApiResponse(responseCode = "409", description = "Chave reutilizada com payload diferente"),
             @ApiResponse(responseCode = "422", description = "Capacidade insuficiente")})
     public Response create(@PathVariable UUID eventId, @Valid @RequestBody CreateRequest request,
-            @Parameter(description = "Chave única da operação (máximo de 160 caracteres). Retry com o mesmo evento e " +
-                    "quantidade retorna a reserva original; reutilização com payload diferente retorna 409.", required = true,
-                    example = "checkout-123-attempt-1")
-            @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 160) String key) {
+                           @Parameter(description = "Chave única da operação (máximo de 160 caracteres). Retry com o mesmo evento e " +
+                                   "quantidade retorna a reserva original; reutilização com payload diferente retorna 409.", required = true,
+                                   example = "checkout-123-attempt-1")
+                           @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 160) String key) {
         return response(reservations.create(eventId, request.quantity(), key));
     }
 
@@ -44,7 +48,9 @@ public class ReservationController {
     @Operation(summary = "Get a reservation", responses = {
             @ApiResponse(responseCode = "200", description = "Reserva encontrada"),
             @ApiResponse(responseCode = "404", description = "Reserva inexistente")})
-    public Response get(@PathVariable UUID id) { return response(reservations.get(id)); }
+    public Response get(@PathVariable UUID id) {
+        return response(reservations.get(id));
+    }
 
     @DeleteMapping("/reservations/{id}")
     @Operation(summary = "Cancel a pending reservation", description = "Idempotent for CANCELLED reservations: retries " +
@@ -52,7 +58,9 @@ public class ReservationController {
             @ApiResponse(responseCode = "200", description = "Reserva cancelada ou cancelamento anterior recuperado"),
             @ApiResponse(responseCode = "404", description = "Reserva inexistente"),
             @ApiResponse(responseCode = "409", description = "Reserva não está pendente")})
-    public Response cancel(@PathVariable UUID id) { return response(reservations.cancel(id)); }
+    public Response cancel(@PathVariable UUID id) {
+        return response(reservations.cancel(id));
+    }
 
     private Response response(Reservation reservation) {
         return new Response(reservation.id(), reservation.eventId(), reservation.quantity(), reservation.status(),

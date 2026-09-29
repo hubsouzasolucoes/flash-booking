@@ -43,10 +43,14 @@ class TransactionalOutboxIT {
         properties.add("spring.datasource.password", POSTGRES::getPassword);
     }
 
-    @Autowired EventUseCases useCases;
-    @Autowired JpaEventRepository events;
-    @Autowired JpaOutboxRepository outbox;
-    @Autowired TransactionTemplate transactions;
+    @Autowired
+    EventUseCases useCases;
+    @Autowired
+    JpaEventRepository events;
+    @Autowired
+    JpaOutboxRepository outbox;
+    @Autowired
+    TransactionTemplate transactions;
 
     @Test
     void commitsBusinessStateAndOutboxTogether() {
@@ -68,8 +72,19 @@ class TransactionalOutboxIT {
 
     @TestConfiguration
     static class Dependencies {
-        @Bean Clock clock() { return Clock.systemUTC(); }
-        @Bean ObjectMapper objectMapper() { return new ObjectMapper().findAndRegisterModules(); }
-        @Bean EventAvailability availability() { return id -> Optional.empty(); }
+        @Bean
+        Clock clock() {
+            return Clock.systemUTC();
+        }
+
+        @Bean
+        ObjectMapper objectMapper() {
+            return new ObjectMapper().findAndRegisterModules();
+        }
+
+        @Bean
+        EventAvailability availability() {
+            return id -> Optional.empty();
+        }
     }
 }

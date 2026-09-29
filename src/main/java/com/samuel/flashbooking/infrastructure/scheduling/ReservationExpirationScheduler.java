@@ -10,7 +10,10 @@ import org.slf4j.LoggerFactory;
 public class ReservationExpirationScheduler {
     private static final Logger log = LoggerFactory.getLogger(ReservationExpirationScheduler.class);
     private final ReservationUseCases reservations;
-    public ReservationExpirationScheduler(ReservationUseCases reservations) { this.reservations = reservations; }
+
+    public ReservationExpirationScheduler(ReservationUseCases reservations) {
+        this.reservations = reservations;
+    }
 
     @Scheduled(fixedDelayString = "${app.expiration-fixed-delay}")
     public void expireReservations() {

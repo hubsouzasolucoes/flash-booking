@@ -6,7 +6,8 @@ Accepted
 
 ## Context
 
-Reservas, retries, cancelamentos e expirações chegam por várias JVMs. Locks locais não protegem o inventário compartilhado
+Reservas, retries, cancelamentos e expirações chegam por várias JVMs. Locks locais não protegem o inventário
+compartilhado
 e `SELECT` seguido de `UPDATE` permitiria overselling.
 
 ## Decision
@@ -25,6 +26,7 @@ Pessimistic locking é usado somente no ciclo terminal da reserva; o hot path us
 
 ## Consequences
 
-Instâncias compartilham garantias sem estado crítico em memória. Operações para a mesma chave ou linha aguardam brevemente;
+Instâncias compartilham garantias sem estado crítico em memória. Operações para a mesma chave ou linha aguardam
+brevemente;
 eventos diferentes continuam concorrentes. Constraints impedem disponibilidade negativa ou acima da capacidade mesmo se
 um defeito ultrapassar a camada de aplicação.

@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.UUID;
 
 @RestController
@@ -17,7 +18,10 @@ import java.util.UUID;
 @Tag(name = "Events", description = "Cadastro de eventos e consulta de capacidade")
 public class EventController {
     private final EventUseCases events;
-    public EventController(EventUseCases events) { this.events = events; }
+
+    public EventController(EventUseCases events) {
+        this.events = events;
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

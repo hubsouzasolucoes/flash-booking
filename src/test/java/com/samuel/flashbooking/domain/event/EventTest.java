@@ -1,7 +1,9 @@
 package com.samuel.flashbooking.domain.event;
 
 import org.junit.jupiter.api.Test;
+
 import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.*;
 
 class EventTest {

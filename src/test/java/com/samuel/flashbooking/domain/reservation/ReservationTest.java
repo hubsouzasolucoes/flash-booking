@@ -1,8 +1,10 @@
 package com.samuel.flashbooking.domain.reservation;
 
 import org.junit.jupiter.api.Test;
+
 import java.time.Instant;
 import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ReservationTest {

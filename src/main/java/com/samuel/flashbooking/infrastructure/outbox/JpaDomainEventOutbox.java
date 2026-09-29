@@ -15,8 +15,10 @@ public class JpaDomainEventOutbox implements DomainEventOutbox {
     private static final Logger log = LoggerFactory.getLogger(JpaDomainEventOutbox.class);
     private final JpaOutboxRepository repository;
     private final ObjectMapper objectMapper;
+
     public JpaDomainEventOutbox(JpaOutboxRepository repository, ObjectMapper objectMapper) {
-        this.repository = repository; this.objectMapper = objectMapper;
+        this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     @Override

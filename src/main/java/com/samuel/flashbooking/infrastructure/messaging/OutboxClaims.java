@@ -15,7 +15,9 @@ import java.util.UUID;
 public class OutboxClaims {
     private final JpaOutboxRepository repository;
 
-    public OutboxClaims(JpaOutboxRepository repository) { this.repository = repository; }
+    public OutboxClaims(JpaOutboxRepository repository) {
+        this.repository = repository;
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<OutboxEventEntity> claim(Instant now) {
@@ -28,7 +30,9 @@ public class OutboxClaims {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void published(UUID id, Instant now) { repository.findById(id).orElseThrow().markPublished(now); }
+    public void published(UUID id, Instant now) {
+        repository.findById(id).orElseThrow().markPublished(now);
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void failed(UUID id, Instant retryAt, String error) {

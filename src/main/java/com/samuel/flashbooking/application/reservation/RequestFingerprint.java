@@ -6,9 +6,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
 
-/** Builds the stable identity of the semantic reservation request. */
+/**
+ * Builds the stable identity of the semantic reservation request.
+ */
 public final class RequestFingerprint {
-    private RequestFingerprint() {}
+    private RequestFingerprint() {
+    }
 
     public static String reservation(UUID eventId, int quantity) {
         String canonical = "eventId=" + eventId + "\nquantity=" + quantity;

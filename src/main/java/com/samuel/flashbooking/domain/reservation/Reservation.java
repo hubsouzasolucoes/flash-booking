@@ -43,11 +43,31 @@ public final class Reservation {
         return true;
     }
 
-    public UUID id() { return id; }
-    public UUID eventId() { return eventId; }
-    public int quantity() { return quantity; }
-    public ReservationStatus status() { return status; }
-    public Instant expiresAt() { return expiresAt; }
-    public Instant createdAt() { return createdAt; }
-    public Instant updatedAt() { return updatedAt; }
+    public UUID id() {
+        return id;
+    }
+
+    public UUID eventId() {
+        return eventId;
+    }
+
+    public int quantity() {
+        return quantity;
+    }
+
+    public ReservationStatus status() {
+        return status;
+    }
+
+    public Instant expiresAt() {
+        return expiresAt;
+    }
+
+    public Instant createdAt() {
+        return createdAt;
+    }
+
+    public Instant updatedAt() {
+        return updatedAt;
+    }
 }

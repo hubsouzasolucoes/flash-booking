@@ -4,7 +4,8 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-public record Event(UUID id, String name, Instant startsAt, int capacity, int availableTickets, long version, Instant createdAt) {
+public record Event(UUID id, String name, Instant startsAt, int capacity, int availableTickets, long version,
+                    Instant createdAt) {
     public Event {
         Objects.requireNonNull(id);
         Objects.requireNonNull(name);

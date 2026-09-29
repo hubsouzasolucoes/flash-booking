@@ -10,7 +10,8 @@ UUID. The response always returns the effective value. During HTTP handling it i
 `finally` block.
 
 Commands copy the effective ID into the domain-event envelope stored by the transactional Outbox. The Kafka consumer
-reads it back into MDC for Inbox and projection processing and removes it afterward. Consequently the implemented path is
+reads it back into MDC for Inbox and projection processing and removes it afterward. Consequently the implemented path
+is
 HTTP → application command → domain-event envelope → Outbox → Kafka → consumer → Inbox/projection. Events produced by
 the expiration scheduler receive a new correlation ID because no originating HTTP request exists. There currently are no
 derived domain events, so `causationId` remains optional and empty.
@@ -28,27 +29,27 @@ idempotency keys are not logged.
 
 Actuator exposes meters at `/actuator/metrics/{name}` and Prometheus format at `/actuator/prometheus`.
 
-| Meter | Type | Tags | Meaning |
-|---|---|---|---|
-| `booking.reservation.created` | counter | none | reservations committed |
-| `booking.reservation.rejected` | counter | `reason=insufficient_capacity\|idempotency_conflict` | expected rejection |
-| `booking.reservation.cancelled` | counter | none | successful terminal transition |
-| `booking.reservation.expired` | counter | none | expired reservations |
-| `booking.reservation.idempotent.replay` | counter | none | repeated logical requests |
-| `booking.reservation.duration` | timer | none | reservation command latency |
-| `booking.idempotency.created` | counter | none | new idempotency records |
-| `booking.idempotency.replay` | counter | none | matching-key replay |
-| `booking.idempotency.conflict` | counter | none | key/payload conflicts |
-| `booking.expiration.batch.duration` | timer | none | expiration worker duration |
-| `booking.outbox.pending` | gauge | none | PENDING plus PROCESSING backlog |
-| `booking.outbox.published` | counter | none | broker-acknowledged publications |
-| `booking.outbox.failed` | counter | none | publication attempts that failed |
-| `booking.outbox.retry` | counter | none | retries scheduled with backoff |
-| `booking.consumer.processed` | counter | `consumer=availability-projection-v1` | applied deliveries |
-| `booking.consumer.duplicate` | counter | `consumer=availability-projection-v1` | Inbox duplicates |
-| `booking.consumer.failed` | counter | `consumer=availability-projection-v1` | handler failures |
-| `booking.consumer.retry` | counter | `consumer=availability-projection-v1` | retry attempts |
-| `booking.consumer.dlt` | counter | `consumer=availability-projection-v1` | records routed to DLT |
+| Meter                                   | Type    | Tags                                                 | Meaning                          |
+|-----------------------------------------|---------|------------------------------------------------------|----------------------------------|
+| `booking.reservation.created`           | counter | none                                                 | reservations committed           |
+| `booking.reservation.rejected`          | counter | `reason=insufficient_capacity\|idempotency_conflict` | expected rejection               |
+| `booking.reservation.cancelled`         | counter | none                                                 | successful terminal transition   |
+| `booking.reservation.expired`           | counter | none                                                 | expired reservations             |
+| `booking.reservation.idempotent.replay` | counter | none                                                 | repeated logical requests        |
+| `booking.reservation.duration`          | timer   | none                                                 | reservation command latency      |
+| `booking.idempotency.created`           | counter | none                                                 | new idempotency records          |
+| `booking.idempotency.replay`            | counter | none                                                 | matching-key replay              |
+| `booking.idempotency.conflict`          | counter | none                                                 | key/payload conflicts            |
+| `booking.expiration.batch.duration`     | timer   | none                                                 | expiration worker duration       |
+| `booking.outbox.pending`                | gauge   | none                                                 | PENDING plus PROCESSING backlog  |
+| `booking.outbox.published`              | counter | none                                                 | broker-acknowledged publications |
+| `booking.outbox.failed`                 | counter | none                                                 | publication attempts that failed |
+| `booking.outbox.retry`                  | counter | none                                                 | retries scheduled with backoff   |
+| `booking.consumer.processed`            | counter | `consumer=availability-projection-v1`                | applied deliveries               |
+| `booking.consumer.duplicate`            | counter | `consumer=availability-projection-v1`                | Inbox duplicates                 |
+| `booking.consumer.failed`               | counter | `consumer=availability-projection-v1`                | handler failures                 |
+| `booking.consumer.retry`                | counter | `consumer=availability-projection-v1`                | retry attempts                   |
+| `booking.consumer.dlt`                  | counter | `consumer=availability-projection-v1`                | records routed to DLT            |
 
 The `reason` and `consumer` values come from closed, code-defined sets. UUIDs, correlation IDs, reservation IDs, event
 IDs, and idempotency keys are deliberately never metric tags. Standard `http.server.requests`, JVM, datasource, and
@@ -61,7 +62,8 @@ Only `health`, `info`, `metrics`, and `prometheus` are exposed over HTTP.
 * `/actuator/health` reports the aggregate, including PostgreSQL and Kafka.
 * `/actuator/health/liveness` checks application process state and deliberately does not restart the process for a
   transient broker/database outage.
-* `/actuator/health/readiness` includes application readiness, PostgreSQL, and Kafka; the Compose application healthcheck
+* `/actuator/health/readiness` includes application readiness, PostgreSQL, and Kafka; the Compose application
+  healthcheck
   uses this endpoint before allowing the proxy to start.
 * `/actuator/info` identifies the application and version.
 

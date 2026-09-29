@@ -6,6 +6,7 @@ import com.samuel.flashbooking.infrastructure.persistence.entity.EventEntity;
 import com.samuel.flashbooking.infrastructure.persistence.repository.JpaEventRepository;
 import org.springframework.stereotype.Repository;
 import jakarta.persistence.EntityManager;
+
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,16 +14,29 @@ import java.util.UUID;
 public class PostgresEventRepository implements EventRepository {
     private final JpaEventRepository repository;
     private final EntityManager entityManager;
+
     public PostgresEventRepository(JpaEventRepository repository, EntityManager entityManager) {
-        this.repository = repository; this.entityManager = entityManager;
+        this.repository = repository;
+        this.entityManager = entityManager;
     }
 
-    @Override public Event save(Event event) { return domain(repository.save(entity(event))); }
-    @Override public boolean existsById(UUID id) { return repository.existsById(id); }
-    @Override public Optional<CapacityState> reserveCapacity(UUID id, int quantity) {
+    @Override
+    public Event save(Event event) {
+        return domain(repository.save(entity(event)));
+    }
+
+    @Override
+    public boolean existsById(UUID id) {
+        return repository.existsById(id);
+    }
+
+    @Override
+    public Optional<CapacityState> reserveCapacity(UUID id, int quantity) {
         return updateCapacity("available_tickets - :quantity", "available_tickets >= :quantity", id, quantity);
     }
-    @Override public CapacityState releaseCapacity(UUID id, int quantity) {
+
+    @Override
+    public CapacityState releaseCapacity(UUID id, int quantity) {
         return updateCapacity("available_tickets + :quantity", "available_tickets + :quantity <= capacity", id, quantity)
                 .orElseThrow(() -> new IllegalStateException("Capacity release invariant violated"));
     }
@@ -30,6 +44,7 @@ public class PostgresEventRepository implements EventRepository {
     private EventEntity entity(Event e) {
         return new EventEntity(e.id(), e.name(), e.startsAt(), e.capacity(), e.availableTickets(), e.version(), e.createdAt());
     }
+
     private Event domain(EventEntity e) {
         return new Event(e.id, e.name, e.startsAt, e.capacity, e.availableTickets, e.version, e.createdAt);
     }

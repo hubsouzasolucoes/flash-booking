@@ -41,30 +41,37 @@ table. This is event-driven state propagation, **not Event Sourcing**.
 
 ## Key Engineering Decisions
 
-- **Zero oversell:** `UPDATE events ... WHERE available_tickets >= ?` is atomic; database constraints are the final guard.
-- **Idempotency:** a transaction-scoped PostgreSQL advisory lock and persistent unique key serialize same-key races across
+- **Zero oversell:** `UPDATE events ... WHERE available_tickets >= ?` is atomic; database constraints are the final
+  guard.
+- **Idempotency:** a transaction-scoped PostgreSQL advisory lock and persistent unique key serialize same-key races
+  across
   instances; same payload replays the original result and a changed payload returns `409`.
 - **Transactional Outbox:** business state and a versioned event envelope commit together, avoiding a database/Kafka
   dual-write window.
-- **At-least-once Kafka + Inbox:** duplicates can occur between broker acknowledgement and Outbox completion; the consumer
+- **At-least-once Kafka + Inbox:** duplicates can occur between broker acknowledgement and Outbox completion; the
+  consumer
   deduplicates `(event_id, consumer)` in the projection transaction.
-- **CQRS for availability:** `GET /events/{id}` reads an asynchronous projection. Kafka never decides whether a ticket is sold.
+- **CQRS for availability:** `GET /events/{id}` reads an asynchronous projection. Kafka never decides whether a ticket
+  is sold.
 - **Single-winner terminal transitions:** row locks and `SKIP LOCKED` coordinate cancellation and expiration workers.
 
 See the [ADRs](docs/adr/) and [architecture detail](docs/architecture.md).
 
 ## Running Locally
 
-Prerequisite: Docker with Docker Compose (Git is needed only to clone). Java, Maven, PostgreSQL, Kafka, and k6 do not need
+Prerequisite: Docker with Docker Compose (Git is needed only to clone). Java, Maven, PostgreSQL, Kafka, and k6 do not
+need
 to be installed for the main path.
 
 ```bash
 docker compose up --build
 ```
 
-Compose starts PostgreSQL, Kafka, one or more application replicas, and an Nginx entry point. Health checks order startup;
+Compose starts PostgreSQL, Kafka, one or more application replicas, and an Nginx entry point. Health checks order
+startup;
 Flyway migrates an empty database and Spring creates the Kafka topics. Local-only defaults are `flash/flash` for the
-PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5432`, and Kafka `9092` (the last
+PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5432`, and Kafka `9092` (the
+last
 two are exposed for optional development/debugging).
 
 ```bash
@@ -82,7 +89,8 @@ No `.env` file is required. Runtime overrides include `DB_*`, `KAFKA_BOOTSTRAP_S
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>
 
 The public contract consists of `POST /events`, `GET /events/{id}`, `POST /events/{id}/reservations`,
-`GET /reservations/{id}`, and `DELETE /reservations/{id}`. Reservation creation requires `Idempotency-Key` (1–160 chars).
+`GET /reservations/{id}`, and `DELETE /reservations/{id}`. Reservation creation requires `Idempotency-Key` (1–160
+chars).
 Errors use `application/problem+json` `ProblemDetail` documents.
 
 ## Example Flow
@@ -144,7 +152,8 @@ events. See [docs/observability.md](docs/observability.md).
 
 PostgreSQL correctness is simple and strong but a single extremely popular event becomes a hot row. Transactional Outbox
 removes dual-write loss at the cost of polling and asynchronous visibility. At-least-once transport is practical but
-requires Inbox idempotency. The availability projection decouples query work but may briefly return an old value or `404`.
+requires Inbox idempotency. The availability projection decouples query work but may briefly return an old value or
+`404`.
 
 ## Future Improvements
 

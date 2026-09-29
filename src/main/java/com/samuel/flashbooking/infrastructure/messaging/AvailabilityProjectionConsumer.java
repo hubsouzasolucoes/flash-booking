@@ -28,7 +28,9 @@ public class AvailabilityProjectionConsumer {
     private final Counter failures;
 
     public AvailabilityProjectionConsumer(ObjectMapper objectMapper, JdbcTemplate jdbc, Clock clock, MeterRegistry metrics) {
-        this.objectMapper = objectMapper; this.jdbc = jdbc; this.clock = clock;
+        this.objectMapper = objectMapper;
+        this.jdbc = jdbc;
+        this.clock = clock;
         processed = metrics.counter("booking.consumer.processed", "consumer", CONSUMER);
         duplicates = metrics.counter("booking.consumer.duplicate", "consumer", CONSUMER);
         failures = metrics.counter("booking.consumer.failed", "consumer", CONSUMER);
@@ -89,7 +91,8 @@ public class AvailabilityProjectionConsumer {
                     payload.path("availableTickets").asInt(), Instant.parse(text(payload, "createdAt")), occurredAt, version);
             return;
         }
-        if (!java.util.Set.of("ReservationCreated", "ReservationCancelled", "ReservationExpired").contains(type)) return;
+        if (!java.util.Set.of("ReservationCreated", "ReservationCancelled", "ReservationExpired").contains(type))
+            return;
         int changed = jdbc.update("UPDATE event_availability_projection SET available_tickets=?,updated_at=?,last_event_version=? " +
                         "WHERE event_id=? AND last_event_version=?", payload.path("availableTickets").asInt(), occurredAt,
                 version, aggregateId, version - 1);
@@ -110,16 +113,25 @@ public class AvailabilityProjectionConsumer {
     private static void validate(JsonNode event) {
         for (String field : java.util.List.of("eventId", "eventType", "eventVersion", "aggregateId", "aggregateType",
                 "aggregateVersion", "occurredAt", "correlationId", "payload")) {
-            if (event.path(field).isMissingNode() || event.path(field).isNull()) throw new InvalidEventException("Missing " + field);
+            if (event.path(field).isMissingNode() || event.path(field).isNull())
+                throw new InvalidEventException("Missing " + field);
         }
         if (event.path("eventVersion").asInt() != 1) throw new InvalidEventException("Unsupported event version");
     }
 
     public static class InvalidEventException extends RuntimeException {
-        public InvalidEventException(String message) { super(message); }
-        public InvalidEventException(String message, Throwable cause) { super(message, cause); }
+        public InvalidEventException(String message) {
+            super(message);
+        }
+
+        public InvalidEventException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
+
     public static class EventOrderingGapException extends RuntimeException {
-        public EventOrderingGapException(String message) { super(message); }
+        public EventOrderingGapException(String message) {
+            super(message);
+        }
     }
 }

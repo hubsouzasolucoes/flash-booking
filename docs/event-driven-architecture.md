@@ -40,6 +40,7 @@ condicional `available_tickets >= quantity`, protegido e validado por constraint
 
 ## Idempotência e observabilidade
 
-`Idempotency-Key` serializa retries HTTP via advisory lock; `eventId` identifica o fato; `aggregateVersion` ordena fatos;
+`Idempotency-Key` serializa retries HTTP via advisory lock; `eventId` identifica o fato; `aggregateVersion` ordena
+fatos;
 Inbox deduplica entrega Kafka; offset apenas controla posição do grupo. Logs estruturados por IDs cobrem criação,
 publicação, retry, consumo, duplicata e projeção. Actuator expõe `outbox.pending`, `outbox.publish.*` e `consumer.*`.

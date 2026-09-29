@@ -8,7 +8,9 @@ public class ApplicationException extends RuntimeException {
         this.code = code;
     }
 
-    public ErrorCode code() { return code; }
+    public ErrorCode code() {
+        return code;
+    }
 
     public enum ErrorCode {
         EVENT_NOT_FOUND, RESERVATION_NOT_FOUND, INSUFFICIENT_CAPACITY,

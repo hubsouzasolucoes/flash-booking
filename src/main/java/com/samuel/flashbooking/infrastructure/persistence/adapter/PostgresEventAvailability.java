@@ -11,7 +11,9 @@ import java.util.UUID;
 public class PostgresEventAvailability implements EventAvailability {
     private final JdbcTemplate jdbc;
 
-    public PostgresEventAvailability(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public PostgresEventAvailability(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
 
     @Override
     public Optional<View> findById(UUID id) {

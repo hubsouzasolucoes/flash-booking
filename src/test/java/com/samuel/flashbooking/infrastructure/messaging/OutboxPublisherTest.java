@@ -18,7 +18,8 @@ import static org.mockito.Mockito.*;
 class OutboxPublisherTest {
     private static final Instant NOW = Instant.parse("2026-09-29T12:00:00Z");
     private final OutboxClaims claims = mock(OutboxClaims.class);
-    @SuppressWarnings("unchecked") private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
+    @SuppressWarnings("unchecked")
+    private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
     private final OutboxPublisher publisher = new OutboxPublisher(claims, kafka,
             Clock.fixed(NOW, ZoneOffset.UTC), new SimpleMeterRegistry(), "events");
 

@@ -68,11 +68,16 @@ class ReservationConcurrencyIT {
         properties.add("app.reservation-ttl", () -> "PT10M");
     }
 
-    @Autowired EventUseCases events;
-    @Autowired ReservationUseCases reservations;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired TransactionTemplate transaction;
-    @Autowired AvailabilityProjectionConsumer projection;
+    @Autowired
+    EventUseCases events;
+    @Autowired
+    ReservationUseCases reservations;
+    @Autowired
+    JdbcTemplate jdbc;
+    @Autowired
+    TransactionTemplate transaction;
+    @Autowired
+    AvailabilityProjectionConsumer projection;
 
     @AfterEach
     void clean() {
@@ -304,9 +309,24 @@ class ReservationConcurrencyIT {
 
     @TestConfiguration
     static class Dependencies {
-        @Bean Clock clock() { return Clock.fixed(NOW, ZoneOffset.UTC); }
-        @Bean ObjectMapper objectMapper() { return new ObjectMapper().findAndRegisterModules(); }
-        @Bean EventAvailability availability() { return id -> Optional.empty(); }
-        @Bean MeterRegistry meterRegistry() { return new SimpleMeterRegistry(); }
+        @Bean
+        Clock clock() {
+            return Clock.fixed(NOW, ZoneOffset.UTC);
+        }
+
+        @Bean
+        ObjectMapper objectMapper() {
+            return new ObjectMapper().findAndRegisterModules();
+        }
+
+        @Bean
+        EventAvailability availability() {
+            return id -> Optional.empty();
+        }
+
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
+        }
     }
 }

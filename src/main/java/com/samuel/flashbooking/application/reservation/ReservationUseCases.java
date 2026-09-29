@@ -44,8 +44,8 @@ public class ReservationUseCases {
     private final Timer expirationBatchDuration;
 
     public ReservationUseCases(EventRepository events, ReservationRepository reservations,
-            IdempotencyStore idempotency, DomainEventOutbox outbox, Clock clock,
-            @Value("${app.reservation-ttl}") Duration ttl, MeterRegistry metrics) {
+                               IdempotencyStore idempotency, DomainEventOutbox outbox, Clock clock,
+                               @Value("${app.reservation-ttl}") Duration ttl, MeterRegistry metrics) {
         this.events = events;
         this.reservations = reservations;
         this.idempotency = idempotency;

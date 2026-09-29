@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 @Configuration
 public class KafkaConfiguration {
     private static final Logger log = LoggerFactory.getLogger(KafkaConfiguration.class);
+
     @Bean
     NewTopic domainEvents(@Value("${app.kafka.events-topic}") String topic) {
         return TopicBuilder.name(topic).partitions(6).replicas(1).build();
@@ -29,7 +30,7 @@ public class KafkaConfiguration {
 
     @Bean
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<Object, Object> operations,
-            @Value("${app.kafka.events-topic}") String topic, MeterRegistry metrics) {
+                                          @Value("${app.kafka.events-topic}") String topic, MeterRegistry metrics) {
         var recoverer = new DeadLetterPublishingRecoverer(operations,
                 (record, exception) -> new TopicPartition(topic + ".dlt", record.partition()));
         var dlt = metrics.counter("booking.consumer.dlt", "consumer", "availability-projection-v1");

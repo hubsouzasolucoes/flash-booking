@@ -4,7 +4,8 @@
 
 A suíte favorece feedback rápido sem substituir provas de infraestrutura por mocks:
 
-* **Unit** — invariantes de `Event` e `Reservation`, limites temporais, fingerprint e contrato JSON dos eventos, sem Spring;
+* **Unit** — invariantes de `Event` e `Reservation`, limites temporais, fingerprint e contrato JSON dos eventos, sem
+  Spring;
 * **Application** — decisões dos casos de uso com ports substituídos, incluindo replay e conflito idempotente;
 * **API** — os cinco endpoints, validação e RFC 9457 `ProblemDetail` com MockMvc isolado;
 * **Architecture** — ArchUnit protege a direção das dependências, controllers e injeção por construtor;
@@ -23,7 +24,8 @@ Containers são compartilhados dentro de cada classe, nunca criados por método.
 ./mvnw clean verify
 ```
 
-Java 21 é necessário fora do container. O Maven Wrapper versionado baixa Maven 3.9.11 na primeira execução. A suíte `verify` requer um daemon Docker acessível ao Testcontainers e não requer o Compose rodando.
+Java 21 é necessário fora do container. O Maven Wrapper versionado baixa Maven 3.9.11 na primeira execução. A suíte
+`verify` requer um daemon Docker acessível ao Testcontainers e não requer o Compose rodando.
 Quando Docker não está disponível, testes marcados com `disabledWithoutDocker` são ignorados em vez de usar H2.
 
 ## Testcontainers e Flyway
@@ -61,7 +63,8 @@ uma prova de correção e nenhum resultado de benchmark é versionado sem uma ex
 
 ## Coverage
 
-`mvn verify` gera o relatório JaCoCo em `target/site/jacoco/index.html`. Não há threshold artificial nesta fase: primeiro
+`mvn verify` gera o relatório JaCoCo em `target/site/jacoco/index.html`. Não há threshold artificial nesta fase:
+primeiro
 é preciso observar o relatório completo num ambiente com Docker e aumentar testes por risco, não por getters. Serviços,
 adapters, concorrência e idempotência não são excluídos.
 

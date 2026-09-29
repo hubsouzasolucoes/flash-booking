@@ -2,6 +2,7 @@ package com.samuel.flashbooking.infrastructure.persistence.repository;
 
 import com.samuel.flashbooking.infrastructure.persistence.entity.IdempotencyEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.util.Optional;
 import java.util.UUID;
 

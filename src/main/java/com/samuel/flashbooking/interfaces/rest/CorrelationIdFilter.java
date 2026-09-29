@@ -33,7 +33,10 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     private UUID parse(String value) {
         if (value == null) return UUID.randomUUID();
-        try { return UUID.fromString(value); }
-        catch (IllegalArgumentException ignored) { return UUID.randomUUID(); }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return UUID.randomUUID();
+        }
     }
 }
