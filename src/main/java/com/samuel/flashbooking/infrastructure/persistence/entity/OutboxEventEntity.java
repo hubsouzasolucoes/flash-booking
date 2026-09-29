@@ -1,0 +1,25 @@
+package com.samuel.flashbooking.infrastructure.persistence.entity;
+
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "outbox_events")
+public class OutboxEventEntity {
+    @Id public UUID id;
+    @Column(name = "aggregate_id", nullable = false) public UUID aggregateId;
+    @Column(name = "aggregate_type", nullable = false, length = 80) public String aggregateType;
+    @Column(name = "event_type", nullable = false, length = 100) public String eventType;
+    @Column(nullable = false, columnDefinition = "text") public String payload;
+    @Column(name = "occurred_at", nullable = false) public Instant occurredAt;
+    @Column(name = "published_at") public Instant publishedAt;
+
+    protected OutboxEventEntity() {}
+    public OutboxEventEntity(UUID id, UUID aggregateId, String aggregateType, String eventType, String payload,
+                             Instant occurredAt) {
+        this.id = id; this.aggregateId = aggregateId; this.aggregateType = aggregateType;
+        this.eventType = eventType; this.payload = payload; this.occurredAt = occurredAt;
+    }
+    public void markPublished(Instant now) { publishedAt = now; }
+}
