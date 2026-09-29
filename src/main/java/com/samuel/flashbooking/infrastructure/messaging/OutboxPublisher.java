@@ -20,12 +20,14 @@ public class OutboxPublisher {
     private final String topic;
     private final Counter success;
     private final Counter failure;
+    private final Counter retry;
 
     public OutboxPublisher(OutboxClaims claims, KafkaTemplate<String, String> kafka, Clock clock,
                            MeterRegistry metrics, @Value("${app.kafka.events-topic}") String topic) {
         this.claims = claims; this.kafka = kafka; this.clock = clock; this.topic = topic;
-        this.success = metrics.counter("outbox.publish.success");
-        this.failure = metrics.counter("outbox.publish.failure");
+        this.success = metrics.counter("booking.outbox.published");
+        this.failure = metrics.counter("booking.outbox.failed");
+        this.retry = metrics.counter("booking.outbox.retry");
     }
 
     @Scheduled(fixedDelayString = "${app.outbox-fixed-delay}")
@@ -50,6 +52,7 @@ public class OutboxPublisher {
         long seconds = Math.min(300, 5L * (1L << Math.min(event.attempts, 6)));
         claims.failed(event.id, clock.instant().plus(Duration.ofSeconds(seconds)), exception.getMessage());
         failure.increment();
+        retry.increment();
         log.warn("outbox retry eventId={} aggregateId={} eventType={} attempt={} delaySeconds={}",
                 event.id, event.aggregateId, event.eventType, event.attempts + 1, seconds);
     }

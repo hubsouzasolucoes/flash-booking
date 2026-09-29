@@ -10,6 +10,7 @@ import com.samuel.flashbooking.domain.reservation.Reservation;
 import com.samuel.flashbooking.interfaces.rest.EventController;
 import com.samuel.flashbooking.interfaces.rest.ReservationController;
 import com.samuel.flashbooking.interfaces.rest.error.ApiExceptionHandler;
+import com.samuel.flashbooking.interfaces.rest.CorrelationIdFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -38,6 +39,7 @@ class PublicApiContractTest {
         validator.afterPropertiesSet();
         mvc = MockMvcBuilders.standaloneSetup(new EventController(events), new ReservationController(reservations))
                 .setControllerAdvice(new ApiExceptionHandler())
+                .addFilters(new CorrelationIdFilter())
                 .setValidator(validator)
                 .build();
     }
@@ -61,13 +63,33 @@ class PublicApiContractTest {
                         .content("{\"name\":\"\",\"startsAt\":null,\"capacity\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value("urn:flash-booking:problem:invalid-request"))
-                .andExpect(jsonPath("$.title").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.type").value("/problems/validation"))
+                .andExpect(jsonPath("$.title").value("VALIDATION"))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.instance").value("/events"));
+                .andExpect(jsonPath("$.instance").value("/events"))
+                .andExpect(jsonPath("$.errors[0].field").exists())
+                .andExpect(jsonPath("$.correlationId").exists());
         mvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Request is malformed or incomplete"));
+    }
+
+    @Test
+    void generatesReusesAndCleansCorrelationIds() throws Exception {
+        Event event = Event.create("Conference", NOW.plusSeconds(86_400), 10, NOW);
+        when(events.create(anyString(), any(), anyInt())).thenReturn(event);
+        Reservation reservation = Reservation.create(event.id(), 1, NOW.plusSeconds(600), NOW);
+        when(reservations.get(any())).thenReturn(reservation);
+        String supplied = UUID.randomUUID().toString();
+
+        mvc.perform(post("/events").header(CorrelationIdFilter.HEADER, supplied)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Conference\",\"startsAt\":\"2100-09-30T12:00:00Z\",\"capacity\":10}"))
+                .andExpect(header().string(CorrelationIdFilter.HEADER, supplied));
+        mvc.perform(get("/reservations/{id}", UUID.randomUUID()))
+                .andExpect(header().string(CorrelationIdFilter.HEADER,
+                        org.hamcrest.Matchers.matchesPattern("[0-9a-f\\-]{36}")));
+        org.assertj.core.api.Assertions.assertThat(org.slf4j.MDC.get("correlationId")).isNull();
     }
 
     @Test
@@ -118,6 +140,30 @@ class PublicApiContractTest {
 
         UUID missing = UUID.randomUUID();
         when(reservations.get(missing)).thenThrow(new ApplicationException(RESERVATION_NOT_FOUND, "not found"));
-        mvc.perform(get("/reservations/{id}", missing)).andExpect(status().isNotFound());
+        mvc.perform(get("/reservations/{id}", missing)).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("/problems/reservation-not-found"))
+                .andExpect(jsonPath("$.correlationId").exists());
+
+        when(reservations.create(eq(eventId), anyInt(), eq("reused")))
+                .thenThrow(new ApplicationException(IDEMPOTENCY_CONFLICT, "different request"));
+        mvc.perform(post("/events/{id}/reservations", eventId).header("Idempotency-Key", "reused")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("/problems/idempotency-conflict"));
+    }
+
+    @Test
+    void unexpectedFailureIsSanitizedAndTraceable() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(reservations.get(id)).thenThrow(new IllegalStateException("jdbc:postgresql://secret/db"));
+
+        mvc.perform(get("/reservations/{id}", id))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("/problems/internal-error"))
+                .andExpect(jsonPath("$.correlationId").exists())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("jdbc:postgresql"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("IllegalStateException"))));
     }
 }

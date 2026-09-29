@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class AvailabilityProjectionConsumerTest {
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -30,6 +31,7 @@ class AvailabilityProjectionConsumerTest {
         consumer.consume(event);
 
         verify(jdbc, times(1)).update(startsWith("UPDATE event_availability_projection"), any(Object[].class));
+        assertThat(org.slf4j.MDC.get("correlationId")).isNull();
     }
 
     @Test

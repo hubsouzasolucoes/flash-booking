@@ -14,7 +14,8 @@ public class ApplicationConfiguration {
 
     @Bean
     MeterBinder outboxPendingGauge(JpaOutboxRepository outbox) {
-        return registry -> Gauge.builder("outbox.pending", outbox, repository -> repository.countByStatus("PENDING"))
+        return registry -> Gauge.builder("booking.outbox.pending", outbox,
+                        repository -> repository.countByStatusIn(java.util.List.of("PENDING", "PROCESSING")))
                 .description("Outbox events awaiting publication").register(registry);
     }
 }

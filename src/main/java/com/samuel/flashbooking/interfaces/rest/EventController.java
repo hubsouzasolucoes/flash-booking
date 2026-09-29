@@ -21,7 +21,7 @@ public class EventController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Criar evento", responses = {
+    @Operation(summary = "Create an event", description = "Creates the authoritative inventory for a future event.", responses = {
             @ApiResponse(responseCode = "201", description = "Evento criado"),
             @ApiResponse(responseCode = "400", description = "Corpo inválido")})
     public Response create(@Valid @RequestBody CreateRequest request) {
@@ -29,7 +29,8 @@ public class EventController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Consultar evento e disponibilidade", responses = {
+    @Operation(summary = "Get event availability", description = "Returns the availability read model. The value may " +
+            "be briefly stale while the asynchronous Outbox/Kafka projection is processing.", responses = {
             @ApiResponse(responseCode = "200", description = "Evento encontrado"),
             @ApiResponse(responseCode = "404", description = "Evento inexistente")})
     public Response get(@PathVariable UUID id) {

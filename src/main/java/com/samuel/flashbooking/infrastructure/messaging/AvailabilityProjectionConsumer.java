@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -28,9 +29,9 @@ public class AvailabilityProjectionConsumer {
 
     public AvailabilityProjectionConsumer(ObjectMapper objectMapper, JdbcTemplate jdbc, Clock clock, MeterRegistry metrics) {
         this.objectMapper = objectMapper; this.jdbc = jdbc; this.clock = clock;
-        processed = metrics.counter("consumer.processed", "consumer", CONSUMER);
-        duplicates = metrics.counter("consumer.duplicate", "consumer", CONSUMER);
-        failures = metrics.counter("consumer.failure", "consumer", CONSUMER);
+        processed = metrics.counter("booking.consumer.processed", "consumer", CONSUMER);
+        duplicates = metrics.counter("booking.consumer.duplicate", "consumer", CONSUMER);
+        failures = metrics.counter("booking.consumer.failed", "consumer", CONSUMER);
     }
 
     @KafkaListener(topics = "${app.kafka.events-topic}", groupId = "${app.kafka.consumer-group}")
@@ -49,18 +50,27 @@ public class AvailabilityProjectionConsumer {
         UUID aggregateId = UUID.fromString(envelope.path("aggregateId").asText());
         String eventType = envelope.path("eventType").asText();
         UUID correlationId = UUID.fromString(envelope.path("correlationId").asText());
+        MDC.put("correlationId", correlationId.toString());
+        try {
+            process(envelope, eventId, aggregateId, eventType, correlationId);
+        } finally {
+            MDC.remove("correlationId");
+        }
+    }
+
+    private void process(JsonNode envelope, UUID eventId, UUID aggregateId, String eventType, UUID correlationId) {
         int inserted = jdbc.update("INSERT INTO inbox_events(event_id,consumer,processed_at) VALUES (?,?,?) " +
                 "ON CONFLICT (event_id,consumer) DO NOTHING", eventId, CONSUMER, clock.instant());
         if (inserted == 0) {
             duplicates.increment();
-            log.info("duplicate ignored eventId={} aggregateId={} eventType={} correlationId={}",
+            log.info("event=consumer_duplicate eventId={} aggregateId={} eventType={} correlationId={}",
                     eventId, aggregateId, eventType, correlationId);
             return;
         }
         try {
             apply(envelope, aggregateId, eventType);
             processed.increment();
-            log.info("projection updated eventId={} aggregateId={} eventType={} correlationId={}",
+            log.debug("event=projection_updated eventId={} aggregateId={} eventType={} correlationId={}",
                     eventId, aggregateId, eventType, correlationId);
         } catch (RuntimeException exception) {
             failures.increment();

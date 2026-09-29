@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -35,6 +36,12 @@ public class ReservationUseCases {
     private final Counter replayed;
     private final Counter cancelled;
     private final Counter expiredCounter;
+    private final Counter idempotencyCreated;
+    private final Counter idempotencyConflict;
+    private final Counter idempotencyReplay;
+    private final Counter idempotencyRejected;
+    private final Timer duration;
+    private final Timer expirationBatchDuration;
 
     public ReservationUseCases(EventRepository events, ReservationRepository reservations,
             IdempotencyStore idempotency, DomainEventOutbox outbox, Clock clock,
@@ -45,25 +52,38 @@ public class ReservationUseCases {
         this.outbox = outbox;
         this.clock = clock;
         this.ttl = ttl;
-        this.created = metrics.counter("reservation.created");
-        this.capacityRejected = metrics.counter("reservation.rejected.capacity");
-        this.replayed = metrics.counter("reservation.idempotent.replay");
-        this.cancelled = metrics.counter("reservation.cancelled");
-        this.expiredCounter = metrics.counter("reservation.expired");
+        this.created = metrics.counter("booking.reservation.created");
+        this.capacityRejected = metrics.counter("booking.reservation.rejected", "reason", "insufficient_capacity");
+        this.replayed = metrics.counter("booking.reservation.idempotent.replay");
+        this.cancelled = metrics.counter("booking.reservation.cancelled");
+        this.expiredCounter = metrics.counter("booking.reservation.expired");
+        this.idempotencyCreated = metrics.counter("booking.idempotency.created");
+        this.idempotencyConflict = metrics.counter("booking.idempotency.conflict");
+        this.idempotencyReplay = metrics.counter("booking.idempotency.replay");
+        this.idempotencyRejected = metrics.counter("booking.reservation.rejected", "reason", "idempotency_conflict");
+        this.duration = metrics.timer("booking.reservation.duration");
+        this.expirationBatchDuration = metrics.timer("booking.expiration.batch.duration");
     }
 
     @Transactional
     public Reservation create(UUID eventId, int quantity, String key) {
+        return duration.record(() -> createReservation(eventId, quantity, key));
+    }
+
+    private Reservation createReservation(UUID eventId, int quantity, String key) {
         String requestHash = RequestFingerprint.reservation(eventId, quantity);
         // A PostgreSQL transaction-scoped advisory lock serializes one key across every API instance.
         idempotency.lock(key);
         var previous = idempotency.find(key);
         if (previous.isPresent()) {
             if (!previous.get().requestHash().equals(requestHash)) {
+                idempotencyConflict.increment();
+                idempotencyRejected.increment();
                 throw new ApplicationException(IDEMPOTENCY_CONFLICT,
                         "Idempotency key was already used with a different request");
             }
             replayed.increment();
+            idempotencyReplay.increment();
             return getRequired(previous.get().reservationId());
         }
         if (!events.existsById(eventId)) {
@@ -78,6 +98,7 @@ public class ReservationUseCases {
         Instant now = clock.instant();
         Reservation reservation = reservations.save(Reservation.create(eventId, quantity, now.plus(ttl), now));
         idempotency.save(key, requestHash, reservation.id(), now);
+        idempotencyCreated.increment();
         outbox.append(event("ReservationCreated", reservation, capacity.orElseThrow(), now));
         created.increment();
         return reservation;
@@ -109,6 +130,10 @@ public class ReservationUseCases {
 
     @Transactional
     public int expireBatch() {
+        return expirationBatchDuration.record(this::expireReservations);
+    }
+
+    private int expireReservations() {
         Instant now = clock.instant();
         int expired = 0;
         for (Reservation reservation : reservations.findExpiredForUpdate(now, EXPIRATION_BATCH_SIZE)) {

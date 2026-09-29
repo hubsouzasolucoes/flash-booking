@@ -25,7 +25,7 @@ public class JpaDomainEventOutbox implements DomainEventOutbox {
             repository.save(new OutboxEventEntity(event.eventId(), event.aggregateId(),
                     event.aggregateType(), event.aggregateVersion(), event.eventType(), event.eventVersion(), objectMapper.writeValueAsString(event),
                     event.occurredAt()));
-            log.info("outbox event created eventId={} aggregateId={} eventType={} correlationId={}",
+            log.debug("event=outbox_created eventId={} aggregateId={} eventType={} correlationId={}",
                     event.eventId(), event.aggregateId(), event.eventType(), event.correlationId());
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Could not serialize domain event", exception);
