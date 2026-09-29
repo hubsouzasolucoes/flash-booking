@@ -45,8 +45,8 @@ curl -X POST http://localhost:8080/events/SEU_EVENT_ID/reservations \
 Com PostgreSQL e Kafka acessíveis nas portas padrão (o próprio Compose os expõe):
 
 ```bash
-mvn test
-mvn clean verify
+mvn test          # suíte rápida: unidade, API isolada e arquitetura
+mvn clean verify  # quality gate completo, incluindo Testcontainers e JaCoCo
 mvn spring-boot:run
 ```
 
@@ -63,6 +63,12 @@ um `UPDATE` condicional no PostgreSQL. Para acompanhar o fluxo, use `docker comp
 A arquitetura está em [`docs/architecture.md`](docs/architecture.md), com detalhes em
 [`docs/event-driven-architecture.md`](docs/event-driven-architecture.md). O diretório
 `load-tests` contém um cenário k6 opcional para concorrência.
+
+## Testing
+
+`mvn test` executa a pirâmide rápida; `mvn clean verify` acrescenta integração e concorrência reais com PostgreSQL,
+as migrations Flyway e gera `target/site/jacoco/index.html`. Docker precisa estar disponível para a suíte completa.
+A estratégia, os invariantes cobertos e o comando de carga via Compose estão em [`docs/testing.md`](docs/testing.md).
 
 ## Concurrency & Consistency
 

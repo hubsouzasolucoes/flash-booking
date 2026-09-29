@@ -60,5 +60,19 @@ services:
     depends_on:
       app: { condition: service_healthy }
 
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: [ "load-test" ]
+    environment:
+      BASE_URL: http://proxy:8080
+      EVENT_ID: ${EVENT_ID:-}
+      VUS: ${VUS:-20}
+      DURATION: ${DURATION:-10s}
+      QUANTITY: ${QUANTITY:-1}
+    volumes: [ "./load-tests:/scripts:ro" ]
+    command: run /scripts/flash-sale.js
+    depends_on:
+      proxy: { condition: service_started }
+
 volumes:
   postgres_data:

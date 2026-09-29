@@ -31,8 +31,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
 @Import({EventUseCases.class, PostgresEventRepository.class, JpaDomainEventOutbox.class,
-        TransactionalOutboxIntegrationTest.Dependencies.class})
-class TransactionalOutboxIntegrationTest {
+        TransactionalOutboxIT.Dependencies.class})
+class TransactionalOutboxIT {
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 

@@ -52,8 +52,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import({EventUseCases.class, ReservationUseCases.class, PostgresEventRepository.class,
         PostgresReservationRepository.class, PostgresIdempotencyStore.class, JpaDomainEventOutbox.class,
         AvailabilityProjectionConsumer.class,
-        ReservationConcurrencyIntegrationTest.Dependencies.class})
-class ReservationConcurrencyIntegrationTest {
+        ReservationConcurrencyIT.Dependencies.class})
+class ReservationConcurrencyIT {
     private static final Instant NOW = Instant.parse("2026-09-29T12:00:00Z");
 
     @Container
