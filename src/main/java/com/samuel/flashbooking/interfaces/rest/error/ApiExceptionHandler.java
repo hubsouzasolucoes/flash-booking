@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import java.net.URI;
 import java.util.List;
+import com.samuel.flashbooking.application.CorrelationIds;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -31,9 +32,9 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail bodyValidation(MethodArgumentNotValidException exception, HttpServletRequest request) {
-        List<String> errors = exception.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage()).toList();
-        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request validation failed", request);
+        List<FieldError> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldError(error.getField(), error.getDefaultMessage())).toList();
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION", "Request validation failed", request);
         problem.setProperty("errors", errors);
         return problem;
     }
@@ -53,8 +54,11 @@ public class ApiExceptionHandler {
     private ProblemDetail problem(HttpStatus status, String code, String detail, HttpServletRequest request) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(code);
-        problem.setType(URI.create("urn:flash-booking:problem:" + code.toLowerCase().replace('_', '-')));
+        problem.setType(URI.create("/problems/" + code.toLowerCase().replace('_', '-')));
         problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("correlationId", CorrelationIds.currentOrNew().toString());
         return problem;
     }
+
+    public record FieldError(String field, String message) {}
 }

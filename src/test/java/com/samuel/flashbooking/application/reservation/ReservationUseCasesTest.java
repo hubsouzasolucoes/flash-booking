@@ -22,11 +22,13 @@ class ReservationUseCasesTest {
     private final IdempotencyStore idempotency = mock(IdempotencyStore.class);
     private final DomainEventOutbox outbox = mock(DomainEventOutbox.class);
     private ReservationUseCases useCases;
+    private SimpleMeterRegistry metrics;
 
     @BeforeEach
     void setUp() {
+        metrics = new SimpleMeterRegistry();
         useCases = new ReservationUseCases(events, reservations, idempotency, outbox,
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(10), new SimpleMeterRegistry());
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(10), metrics);
     }
 
     @Test
@@ -43,6 +45,19 @@ class ReservationUseCasesTest {
         verify(idempotency).lock("request-1");
         verify(idempotency).save(eq("request-1"), anyString(), eq(result.id()), eq(NOW));
         verify(outbox).append(any());
+        assertThat(metrics.counter("booking.reservation.created").count()).isEqualTo(1);
+    }
+
+    @Test
+    void capacityRejectionUsesBoundedReasonTag() {
+        UUID eventId = UUID.randomUUID();
+        when(events.existsById(eventId)).thenReturn(true);
+        when(events.reserveCapacity(eventId, 2)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCases.create(eventId, 2, "sold-out"))
+                .isInstanceOf(ApplicationException.class);
+        assertThat(metrics.counter("booking.reservation.rejected", "reason", "insufficient_capacity").count())
+                .isEqualTo(1);
     }
 
     @Test

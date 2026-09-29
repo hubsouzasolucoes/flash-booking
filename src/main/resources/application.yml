@@ -26,8 +26,11 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       enable-auto-commit: false
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -35,11 +38,26 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db,kafka
+    prometheus:
+      access: read_only
+  info:
+    env:
+      enabled: true
+info:
+  app:
+    name: Flash Booking API
+    version: '@project.version@'
+logging:
+  pattern:
+    level: "%5p correlationId=%X{correlationId:-none}"
 app:
   reservation-ttl: ${RESERVATION_TTL:PT10M}
   outbox-fixed-delay: ${OUTBOX_FIXED_DELAY_MS:1000}

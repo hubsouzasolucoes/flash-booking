@@ -25,7 +25,8 @@ public class ReservationController {
 
     @PostMapping("/events/{eventId}/reservations")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Reservar ingressos", description = "Retries com a mesma chave e payload retornam a reserva original.", responses = {
+    @Operation(summary = "Create a reservation", description = "Atomically reserves tickets. Retries with the same " +
+            "Idempotency-Key and payload return the original reservation; a different payload returns 409.", responses = {
             @ApiResponse(responseCode = "201", description = "Reserva criada ou recuperada por retry"),
             @ApiResponse(responseCode = "400", description = "Request ou Idempotency-Key inválido"),
             @ApiResponse(responseCode = "404", description = "Evento inexistente"),
@@ -40,14 +41,14 @@ public class ReservationController {
     }
 
     @GetMapping("/reservations/{id}")
-    @Operation(summary = "Consultar reserva", responses = {
+    @Operation(summary = "Get a reservation", responses = {
             @ApiResponse(responseCode = "200", description = "Reserva encontrada"),
             @ApiResponse(responseCode = "404", description = "Reserva inexistente")})
     public Response get(@PathVariable UUID id) { return response(reservations.get(id)); }
 
     @DeleteMapping("/reservations/{id}")
-    @Operation(summary = "Cancelar reserva pendente", description = "Operação idempotente: retries de uma reserva já " +
-            "cancelada retornam o mesmo estado sem devolver capacidade novamente.", responses = {
+    @Operation(summary = "Cancel a pending reservation", description = "Idempotent for CANCELLED reservations: retries " +
+            "return the terminal state without releasing capacity twice. PENDING becomes CANCELLED; EXPIRED returns 409.", responses = {
             @ApiResponse(responseCode = "200", description = "Reserva cancelada ou cancelamento anterior recuperado"),
             @ApiResponse(responseCode = "404", description = "Reserva inexistente"),
             @ApiResponse(responseCode = "409", description = "Reserva não está pendente")})

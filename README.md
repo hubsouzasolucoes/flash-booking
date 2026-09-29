@@ -64,6 +64,19 @@ A arquitetura está em [`docs/architecture.md`](docs/architecture.md), com detal
 [`docs/event-driven-architecture.md`](docs/event-driven-architecture.md). O diretório
 `load-tests` contém um cenário k6 opcional para concorrência.
 
+## Observability
+
+The local operational surface is intentionally small: [health](http://localhost:8080/actuator/health),
+[liveness](http://localhost:8080/actuator/health/liveness),
+[readiness](http://localhost:8080/actuator/health/readiness),
+[metrics](http://localhost:8080/actuator/metrics), and
+[Prometheus exposition](http://localhost:8080/actuator/prometheus). API discovery is available through
+[Swagger UI](http://localhost:8080/swagger-ui.html) and [OpenAPI JSON](http://localhost:8080/v3/api-docs).
+
+Clients may send a UUID in `X-Correlation-Id`; otherwise the API generates one. The value is returned in every response
+and included in error bodies and asynchronous domain-event envelopes. See
+[`docs/observability.md`](docs/observability.md) for metric names, log fields, health semantics, and troubleshooting.
+
 ## Testing
 
 `mvn test` executa a pirâmide rápida; `mvn clean verify` acrescenta integração e concorrência reais com PostgreSQL,
