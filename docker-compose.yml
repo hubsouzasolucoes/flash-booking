@@ -5,7 +5,9 @@ services:
       POSTGRES_DB: flash_booking
       POSTGRES_USER: flash
       POSTGRES_PASSWORD: flash
-    ports: [ "${POSTGRES_PORT:-5432}:5432" ]
+    # Use a non-default host port so an installed PostgreSQL cannot be mistaken
+    # for this container by an application started from the IDE.
+    ports: [ "${POSTGRES_PORT:-5433}:5432" ]
     healthcheck:
       test:
         - CMD-SHELL

@@ -70,7 +70,7 @@ docker compose up --build
 Compose starts PostgreSQL, Kafka, one or more application replicas, and an Nginx entry point. Health checks order
 startup;
 Flyway migrates an empty database and Spring creates the Kafka topics. Local-only defaults are `flash/flash` for the
-PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5432` by default (configurable
+PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5433` by default (configurable
 with `POSTGRES_PORT`), and Kafka `9092`; the last two are exposed for optional development/debugging.
 
 ```bash
@@ -93,20 +93,26 @@ docker compose up -d postgres kafka
 ```
 
 The application's defaults match Compose: database `flash_booking`, user/password `flash/flash`, PostgreSQL on
-`localhost:5432`, and Kafka on `localhost:9092`. An IDE run configuration therefore does not need environment variables
+`localhost:5433`, and Kafka on `localhost:9092`. Port `5433` is intentional: it prevents an application started from the
+IDE from silently connecting to another PostgreSQL installation on the standard port `5432`. An IDE run configuration
+therefore does not need environment variables
 unless those defaults have been overridden. The Compose health check performs an authenticated query (rather than only
 checking whether a PostgreSQL server is listening), so an old or incorrectly initialized database is reported as
 unhealthy before the application starts.
 
 If startup reports `FATAL: role "flash" does not exist`, PostgreSQL is reachable, but the server listening on port
-`5432` was not initialized with this project's credentials. First verify that the project container is running and
-publishing the expected port, then inspect its initialization log:
+configured by `DB_URL` was not initialized with this project's credentials. Recreate the PostgreSQL container so the
+current port mapping is applied, then verify the exact host port and initialization log:
 
 ```bash
-docker compose ps postgres
+docker compose up -d --force-recreate postgres kafka
 docker compose port postgres 5432
 docker compose logs postgres
 ```
+
+`docker compose port postgres 5432` must print `5433` as the host port (the address can be `0.0.0.0`, `127.0.0.1`, or
+`[::]`). Also remove stale `DB_URL`, `DB_USER`, `DB_PASSWORD`, or `SPRING_DATASOURCE_*` values from the IDE run
+configuration; otherwise they override the defaults above.
 
 The official PostgreSQL image applies `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` only when it initializes an
 empty data directory. Consequently, a named volume created with older credentials is not changed by restarting the
@@ -123,12 +129,12 @@ preserved, create the `flash` login/database with an existing
 PostgreSQL administrator or set `DB_URL`, `DB_USER`, and `DB_PASSWORD` in the IDE to credentials already present in that
 database instead of removing the volume.
 
-If another PostgreSQL installation already owns host port `5432`, publish this project's database on a different port
-and give the host-run application the matching JDBC URL:
+To use a host port other than `5433`, publish the container on that port and give the host-run application the matching
+JDBC URL:
 
 ```bash
-POSTGRES_PORT=5433 docker compose up -d postgres kafka
-DB_URL=jdbc:postgresql://localhost:5433/flash_booking ./mvnw spring-boot:run
+POSTGRES_PORT=15432 docker compose up -d --force-recreate postgres kafka
+DB_URL=jdbc:postgresql://localhost:15432/flash_booking ./mvnw spring-boot:run
 ```
 
 ## API / Swagger
