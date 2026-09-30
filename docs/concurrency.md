@@ -1,6 +1,6 @@
 # Concorrência e consistência
 
-## Overselling
+## Venda além da capacidade
 
 O write model concede capacidade com `UPDATE events SET available_tickets = available_tickets - :quantity,
 version = version + 1 WHERE id = :id AND available_tickets >= :quantity RETURNING available_tickets, version`.
@@ -8,13 +8,13 @@ O lock de linha inerente ao update e a reavaliação do predicado pelo PostgreSQ
 vindos
 de JVMs diferentes. As constraints mantêm `0 <= available_tickets <= capacity`. A projeção nunca autoriza uma venda.
 
-## Atomicity
+## Atomicidade
 
 Uma criação engloba advisory lock da chave, leitura da idempotência, aquisição de capacidade, insert da reserva, insert
 do
 registro idempotente e insert da Outbox em uma transação. Qualquer exceção reverte tudo. Kafka não está no request path.
 
-## Idempotency
+## Idempotência
 
 `Idempotency-Key` é obrigatório. SHA-256 é calculado da representação canônica de `eventId` e `quantity`. O advisory
 lock
@@ -23,25 +23,25 @@ reserva
 original com 201; payload diferente retorna 409. Uma falha causa rollback inclusive do lock/registro; retry após commit
 reencontra a resposta persistida.
 
-## Cancellation
+## Cancelamento
 
 `SELECT ... FOR UPDATE` serializa operações sobre a reserva. A primeira transição `PENDING -> CANCELLED` devolve
 ingressos
 e cria um evento. Repetir DELETE de uma reserva já cancelada devolve o mesmo estado sem nova liberação ou evento (200).
 Cancelar uma reserva expirada é conflito 409.
 
-## Expiration
+## Expiração
 
 Workers selecionam somente vencidas pendentes via `FOR UPDATE SKIP LOCKED`. Uma linha fica em exatamente um lote; apenas
 a transição vencedora libera capacidade e escreve `ReservationExpired`.
 
-## Cancel vs expire
+## Cancelamento versus expiração
 
 Ambos adquirem o mesmo lock pessimista da reserva antes de alterar o evento. Um encontra `PENDING`; o outro observa o
 estado
 terminal após o commit. Assim somente um evento terminal e uma liberação ocorrem.
 
-## Eventual consistency
+## Consistência eventual
 
 Outbox e estado são atômicos, mas publicação é at-least-once. Inbox `(event_id, consumer)` deduplica na mesma transação
 da
@@ -63,18 +63,18 @@ variáveis, 50 retries da mesma chave, cancelamento, múltiplos expiradores, can
 versus
 novas reservas, rollback e Inbox/projeção duplicada. A demonstração de três processos completos é o Compose acima.
 
-## Contention model
+## Modelo de contenção
 
 ```mermaid
 flowchart LR
-  A[Request A] --> U[Atomic conditional UPDATE<br/>on one event row]
-  B[Request B] --> U
-  C[Request C] --> U
-  U --> W[Enough capacity: commit]
-  U --> L[Sold out: 422, no mutation]
+  A[Requisição A] --> U[UPDATE condicional atômico<br/>em uma linha de evento]
+  B[Requisição B] --> U
+  C[Requisição C] --> U
+  U --> W[Capacidade suficiente: commit]
+  U --> L[Esgotado: 422, sem alteração]
 ```
 
-A single hot event can funnel tens of thousands of requests into the same row. Multiple JVMs improve HTTP throughput but
-do not remove that serialization point. The current design intentionally chooses correctness and operational simplicity.
-At much larger scale, partitioned ownership, admission control/waiting rooms, backpressure, or sharding by event could
-bound contention; these require a different operational model and are not claimed here.
+Um único evento muito disputado pode concentrar dezenas de milhares de requisições na mesma linha. Várias JVMs melhoram
+a vazão HTTP, mas não removem esse ponto de serialização. O desenho atual escolhe intencionalmente correção e simplicidade
+operacional. Em escala muito maior, propriedade particionada, controle de admissão ou sala de espera, backpressure e
+sharding por evento podem limitar a contenção; essas opções exigem outro modelo operacional e não são prometidas aqui.

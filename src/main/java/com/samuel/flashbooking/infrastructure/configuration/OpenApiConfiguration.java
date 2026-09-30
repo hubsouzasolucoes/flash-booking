@@ -10,7 +10,7 @@ public class OpenApiConfiguration {
     @Bean
     OpenAPI api() {
         return new OpenAPI().info(new Info().title("Flash Booking API").version("1.0.0")
-                .description("Ticket reservation API for flash sales, with persistent idempotency and eventually " +
-                        "consistent availability read models."));
+                .description("API de reserva de ingressos para vendas relâmpago, com idempotência persistente e " +
+                        "modelos de leitura de disponibilidade eventualmente consistentes."));
     }
 }

@@ -1,32 +1,32 @@
-# ADR-007: Local observability strategy
+# ADR-007: Estratégia de observabilidade local
 
-## Status
+## Situação
 
-Accepted
+Aceita
 
-## Context
+## Contexto
 
-Operators need to connect an HTTP reservation to its asynchronous projection, distinguish business rejection from system
-failure, and assess PostgreSQL, Kafka, Outbox, and consumer state. The technical exercise must remain runnable locally
-without a mandatory monitoring stack or SaaS account.
+Operadores precisam relacionar uma reserva HTTP à sua projeção assíncrona, diferenciar rejeição de negócio de falha do
+sistema e avaliar PostgreSQL, Kafka, Outbox e consumidores. O exercício deve continuar executável localmente sem exigir
+uma plataforma de monitoramento ou conta SaaS.
 
-## Decision
+## Decisão
 
-Use Spring Boot Actuator for a deliberately limited health/info/metrics surface, Micrometer for low-cardinality business
-and pipeline meters, and SLF4J MDC plus structured key/value messages for investigation. Propagate a UUID correlation ID
-from HTTP through the persisted event envelope to the Kafka consumer. Readiness includes PostgreSQL and Kafka; liveness
-only represents the application process. Expose Prometheus text format as an optional integration point, without running
-a Prometheus server.
+Usar Spring Boot Actuator para uma superfície limitada de saúde, informações e métricas; Micrometer para métricas de
+negócio e pipeline de baixa cardinalidade; e MDC do SLF4J com mensagens estruturadas para investigação. Propagar um UUID
+de correlação do HTTP, passando pelo envelope persistido, até o consumidor Kafka. A prontidão inclui PostgreSQL e Kafka;
+a vivacidade representa apenas o processo. Expor o formato Prometheus como integração opcional, sem executar um servidor
+Prometheus.
 
-## Consequences
+## Consequências
 
-The application answers common operational questions on a laptop and is ready for an external scraper or log shipper.
-Unique identifiers stay in logs rather than metric tags. A bounded Kafka metadata request makes readiness meaningful.
-Correlation is explicit but does not provide cross-service spans or sampling. Deployment owners remain responsible for
-access control around Actuator endpoints when exposing the service outside a trusted local network.
+A aplicação responde às perguntas operacionais comuns em uma máquina local e fica pronta para um coletor externo. IDs
+únicos permanecem nos logs, não nas tags de métricas. Uma consulta limitada aos metadados do Kafka torna a prontidão
+significativa. A correlação explícita não fornece spans nem amostragem. Ao expor o serviço fora de uma rede confiável,
+os responsáveis pelo deploy devem proteger os endpoints do Actuator.
 
-## Alternatives Considered
+## Alternativas consideradas
 
-A required Grafana/Prometheus/ELK/Loki stack was rejected as disproportionate local infrastructure. A SaaS agent was
-rejected because it creates credentials, cost, and vendor coupling. OpenTelemetry tracing was deferred until multiple
-services make span context materially more useful than the current correlation ID.
+Uma stack obrigatória com Grafana, Prometheus, ELK ou Loki foi rejeitada por ser desproporcional. Um agente SaaS criaria
+credenciais, custo e acoplamento a fornecedor. O tracing com OpenTelemetry foi adiado até que múltiplos serviços tornem
+spans mais úteis que o ID de correlação atual.

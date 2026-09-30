@@ -49,7 +49,7 @@ class PublicApiContractTest {
         Event event = Event.create("Java Conference", NOW.plusSeconds(86_400), 10, NOW);
         when(events.create(anyString(), any(), eq(10))).thenReturn(event);
 
-        mvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Java Conference\",\"startsAt\":\"2100-09-30T12:00:00Z\",\"capacity\":10}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(event.id().toString()))
@@ -59,17 +59,17 @@ class PublicApiContractTest {
 
     @Test
     void rejectsInvalidAndMalformedEventBodiesWithProblemDetail() throws Exception {
-        mvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"\",\"startsAt\":null,\"capacity\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("/problems/validation"))
                 .andExpect(jsonPath("$.title").value("VALIDATION"))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.instance").value("/events"))
+                .andExpect(jsonPath("$.instance").value("/eventos"))
                 .andExpect(jsonPath("$.errors[0].field").exists())
                 .andExpect(jsonPath("$.correlationId").exists());
-        mvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content("{"))
+        mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Request is malformed or incomplete"));
     }
@@ -82,11 +82,11 @@ class PublicApiContractTest {
         when(reservations.get(any())).thenReturn(reservation);
         String supplied = UUID.randomUUID().toString();
 
-        mvc.perform(post("/events").header(CorrelationIdFilter.HEADER, supplied)
+        mvc.perform(post("/eventos").header(CorrelationIdFilter.HEADER, supplied)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Conference\",\"startsAt\":\"2100-09-30T12:00:00Z\",\"capacity\":10}"))
                 .andExpect(header().string(CorrelationIdFilter.HEADER, supplied));
-        mvc.perform(get("/reservations/{id}", UUID.randomUUID()))
+        mvc.perform(get("/reservas/{id}", UUID.randomUUID()))
                 .andExpect(header().string(CorrelationIdFilter.HEADER,
                         org.hamcrest.Matchers.matchesPattern("[0-9a-f\\-]{36}")));
         org.assertj.core.api.Assertions.assertThat(org.slf4j.MDC.get("correlationId")).isNull();
@@ -97,12 +97,12 @@ class PublicApiContractTest {
         UUID id = UUID.randomUUID();
         when(events.getAvailability(id)).thenReturn(new EventAvailability.View(id, "Talk", NOW.plusSeconds(3600),
                 20, 17, NOW, NOW, 4));
-        mvc.perform(get("/events/{id}", id)).andExpect(status().isOk())
+        mvc.perform(get("/eventos/{id}", id)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.availableTickets").value(17));
 
         UUID missing = UUID.randomUUID();
         when(events.getAvailability(missing)).thenThrow(new ApplicationException(EVENT_NOT_FOUND, "not found"));
-        mvc.perform(get("/events/{id}", missing)).andExpect(status().isNotFound())
+        mvc.perform(get("/eventos/{id}", missing)).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"));
     }
 
@@ -115,14 +115,14 @@ class PublicApiContractTest {
         reservation.cancel(NOW.plusSeconds(1));
         when(reservations.cancel(reservation.id())).thenReturn(reservation);
 
-        mvc.perform(post("/events/{id}/reservations", eventId).header("Idempotency-Key", "checkout-1")
+        mvc.perform(post("/eventos/{id}/reservas", eventId).header("Idempotency-Key", "checkout-1")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":2}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.quantity").value(2));
-        mvc.perform(get("/reservations/{id}", reservation.id()))
+        mvc.perform(get("/reservas/{id}", reservation.id()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(reservation.id().toString()));
-        mvc.perform(delete("/reservations/{id}", reservation.id()))
+        mvc.perform(delete("/reservas/{id}", reservation.id()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
-        mvc.perform(post("/events/{id}/reservations", eventId)
+        mvc.perform(post("/eventos/{id}/reservas", eventId)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
                 .andExpect(status().isBadRequest());
     }
@@ -132,7 +132,7 @@ class PublicApiContractTest {
         UUID eventId = UUID.randomUUID();
         when(reservations.create(eq(eventId), anyInt(), anyString()))
                 .thenThrow(new ApplicationException(INSUFFICIENT_CAPACITY, "Not enough tickets available"));
-        mvc.perform(post("/events/{id}/reservations", eventId).header("Idempotency-Key", "sellout")
+        mvc.perform(post("/eventos/{id}/reservas", eventId).header("Idempotency-Key", "sellout")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.title").value("INSUFFICIENT_CAPACITY"))
@@ -140,13 +140,13 @@ class PublicApiContractTest {
 
         UUID missing = UUID.randomUUID();
         when(reservations.get(missing)).thenThrow(new ApplicationException(RESERVATION_NOT_FOUND, "not found"));
-        mvc.perform(get("/reservations/{id}", missing)).andExpect(status().isNotFound())
+        mvc.perform(get("/reservas/{id}", missing)).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("/problems/reservation-not-found"))
                 .andExpect(jsonPath("$.correlationId").exists());
 
         when(reservations.create(eq(eventId), anyInt(), eq("reused")))
                 .thenThrow(new ApplicationException(IDEMPOTENCY_CONFLICT, "different request"));
-        mvc.perform(post("/events/{id}/reservations", eventId).header("Idempotency-Key", "reused")
+        mvc.perform(post("/eventos/{id}/reservas", eventId).header("Idempotency-Key", "reused")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("/problems/idempotency-conflict"));
@@ -157,7 +157,7 @@ class PublicApiContractTest {
         UUID id = UUID.randomUUID();
         when(reservations.get(id)).thenThrow(new IllegalStateException("jdbc:postgresql://secret/db"));
 
-        mvc.perform(get("/reservations/{id}", id))
+        mvc.perform(get("/reservas/{id}", id))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.type").value("/problems/internal-error"))
                 .andExpect(jsonPath("$.correlationId").exists())

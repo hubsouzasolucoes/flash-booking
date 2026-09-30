@@ -1,86 +1,74 @@
-# Observability
+# Observabilidade
 
-The application uses Spring Boot Actuator, Micrometer, and searchable key/value logs. This keeps local operation simple
-while allowing a deployment to scrape Prometheus format or ship logs later without changing business code.
+A aplicação usa Spring Boot Actuator, Micrometer e logs pesquisáveis em pares chave/valor. Isso simplifica a operação
+local e permite coletar o formato Prometheus ou enviar logs futuramente sem mudar o código de negócio.
 
-## Correlation
+## Correlação
 
-`X-Correlation-Id` accepts a UUID. A valid caller value is reused; an absent or malformed value is replaced with a new
-UUID. The response always returns the effective value. During HTTP handling it is held in the MDC and removed in a
-`finally` block.
+`X-Correlation-Id` aceita um UUID. Um valor válido do cliente é reutilizado; valor ausente ou inválido é substituído. A
+resposta sempre devolve o valor efetivo, mantido no MDC durante o HTTP e removido em um bloco `finally`.
 
-Commands copy the effective ID into the domain-event envelope stored by the transactional Outbox. The Kafka consumer
-reads it back into MDC for Inbox and projection processing and removes it afterward. Consequently the implemented path
-is
-HTTP → application command → domain-event envelope → Outbox → Kafka → consumer → Inbox/projection. Events produced by
-the expiration scheduler receive a new correlation ID because no originating HTTP request exists. There currently are no
-derived domain events, so `causationId` remains optional and empty.
+Os comandos copiam esse ID para o envelope persistido pela Outbox. O consumidor Kafka o restaura no MDC durante Inbox e
+projeção. O caminho implementado é HTTP → comando → envelope → Outbox → Kafka → consumidor → Inbox/projeção. Eventos do
+agendador de expiração recebem um novo ID, pois não há requisição HTTP de origem. `causationId` permanece opcional e vazio.
 
-## Logging
+## Logs
 
-Every log line carries the MDC `correlationId` in the configured pattern. Event-oriented messages use stable fields such
-as `event`, `eventId`, `aggregateId`, `eventType`, and `reservationId` when relevant. INFO is reserved for batch or
-operational outcomes; per-event projection and Outbox creation details are DEBUG. WARN reports publication retry,
-consumer retry, and DLT routing. The REST boundary logs unexpected failures once at ERROR. Expected capacity and
-idempotency conflicts do not produce stack traces. Payloads, headers, credentials, connection strings, and complete
-idempotency keys are not logged.
+Cada linha contém `correlationId` no MDC. Mensagens usam campos estáveis como `event`, `eventId`, `aggregateId`,
+`eventType` e `reservationId`. INFO registra resultados operacionais; detalhes por evento ficam em DEBUG; WARN registra
+retry e DLT; a fronteira REST registra falhas inesperadas uma vez em ERROR. Conflitos esperados não geram stack trace.
+Payloads, headers, credenciais, strings de conexão e chaves idempotentes completas não são registrados.
 
-## Metrics
+## Métricas
 
-Actuator exposes meters at `/actuator/metrics/{name}` and Prometheus format at `/actuator/prometheus`.
+O Actuator expõe métricas em `/actuator/metrics/{name}` e no formato Prometheus em `/actuator/prometheus`.
 
-| Meter                                   | Type    | Tags                                                 | Meaning                          |
-|-----------------------------------------|---------|------------------------------------------------------|----------------------------------|
-| `booking.reservation.created`           | counter | none                                                 | reservations committed           |
-| `booking.reservation.rejected`          | counter | `reason=insufficient_capacity\|idempotency_conflict` | expected rejection               |
-| `booking.reservation.cancelled`         | counter | none                                                 | successful terminal transition   |
-| `booking.reservation.expired`           | counter | none                                                 | expired reservations             |
-| `booking.reservation.idempotent.replay` | counter | none                                                 | repeated logical requests        |
-| `booking.reservation.duration`          | timer   | none                                                 | reservation command latency      |
-| `booking.idempotency.created`           | counter | none                                                 | new idempotency records          |
-| `booking.idempotency.replay`            | counter | none                                                 | matching-key replay              |
-| `booking.idempotency.conflict`          | counter | none                                                 | key/payload conflicts            |
-| `booking.expiration.batch.duration`     | timer   | none                                                 | expiration worker duration       |
-| `booking.outbox.pending`                | gauge   | none                                                 | PENDING plus PROCESSING backlog  |
-| `booking.outbox.published`              | counter | none                                                 | broker-acknowledged publications |
-| `booking.outbox.failed`                 | counter | none                                                 | publication attempts that failed |
-| `booking.outbox.retry`                  | counter | none                                                 | retries scheduled with backoff   |
-| `booking.consumer.processed`            | counter | `consumer=availability-projection-v1`                | applied deliveries               |
-| `booking.consumer.duplicate`            | counter | `consumer=availability-projection-v1`                | Inbox duplicates                 |
-| `booking.consumer.failed`               | counter | `consumer=availability-projection-v1`                | handler failures                 |
-| `booking.consumer.retry`                | counter | `consumer=availability-projection-v1`                | retry attempts                   |
-| `booking.consumer.dlt`                  | counter | `consumer=availability-projection-v1`                | records routed to DLT            |
+| Métrica | Tipo | Tags | Significado |
+|---|---|---|---|
+| `booking.reservation.created` | contador | nenhuma | reservas confirmadas |
+| `booking.reservation.rejected` | contador | `reason=insufficient_capacity\|idempotency_conflict` | rejeição esperada |
+| `booking.reservation.cancelled` | contador | nenhuma | cancelamento concluído |
+| `booking.reservation.expired` | contador | nenhuma | reservas expiradas |
+| `booking.reservation.idempotent.replay` | contador | nenhuma | requisições lógicas repetidas |
+| `booking.reservation.duration` | temporizador | nenhuma | latência do comando de reserva |
+| `booking.idempotency.created` | contador | nenhuma | novos registros idempotentes |
+| `booking.idempotency.replay` | contador | nenhuma | repetição com chave correspondente |
+| `booking.idempotency.conflict` | contador | nenhuma | conflitos de chave/payload |
+| `booking.expiration.batch.duration` | temporizador | nenhuma | duração do worker de expiração |
+| `booking.outbox.pending` | medidor | nenhuma | backlog PENDING e PROCESSING |
+| `booking.outbox.published` | contador | nenhuma | publicações confirmadas pelo broker |
+| `booking.outbox.failed` | contador | nenhuma | tentativas de publicação com falha |
+| `booking.outbox.retry` | contador | nenhuma | novas tentativas agendadas |
+| `booking.consumer.processed` | contador | `consumer=availability-projection-v1` | entregas aplicadas |
+| `booking.consumer.duplicate` | contador | `consumer=availability-projection-v1` | duplicatas da Inbox |
+| `booking.consumer.failed` | contador | `consumer=availability-projection-v1` | falhas do handler |
+| `booking.consumer.retry` | contador | `consumer=availability-projection-v1` | novas tentativas |
+| `booking.consumer.dlt` | contador | `consumer=availability-projection-v1` | registros enviados à DLT |
 
-The `reason` and `consumer` values come from closed, code-defined sets. UUIDs, correlation IDs, reservation IDs, event
-IDs, and idempotency keys are deliberately never metric tags. Standard `http.server.requests`, JVM, datasource, and
-Kafka client meters remain available and are not reimplemented.
+Os valores de `reason` e `consumer` vêm de conjuntos fechados definidos no código. UUIDs e IDs não são tags. As métricas
+padrão de HTTP, JVM, datasource e clientes Kafka continuam disponíveis.
 
-## Health
+## Saúde
 
-Only `health`, `info`, `metrics`, and `prometheus` are exposed over HTTP.
+Somente `health`, `info`, `metrics` e `prometheus` são expostos via HTTP.
 
-* `/actuator/health` reports the aggregate, including PostgreSQL and Kafka.
-* `/actuator/health/liveness` checks application process state and deliberately does not restart the process for a
-  transient broker/database outage.
-* `/actuator/health/readiness` includes application readiness, PostgreSQL, and Kafka; the Compose application
-  healthcheck
-  uses this endpoint before allowing the proxy to start.
-* `/actuator/info` identifies the application and version.
+- `/actuator/health` agrega PostgreSQL e Kafka.
+- `/actuator/health/liveness` representa o processo e não o reinicia por falha transitória externa.
+- `/actuator/health/readiness` inclui aplicação, PostgreSQL e Kafka e é usado pelo healthcheck do Compose.
+- `/actuator/info` identifica aplicação e versão.
 
-Health details do not include credentials. The Kafka check performs a bounded cluster metadata request.
+Os detalhes não incluem credenciais. A verificação do Kafka faz uma consulta limitada aos metadados do cluster.
 
-## Troubleshooting
+## Diagnóstico
 
-* **A reservation failed unexpectedly:** copy `correlationId` from the response/header and search application logs. Then
-  use `reservationId`, `eventId`, and `eventType` fields to narrow the flow.
-* **The read model looks stale:** inspect `booking.outbox.pending`, `booking.consumer.failed`,
-  `booking.consumer.retry`, and `booking.consumer.dlt`; search Outbox retry and consumer logs.
-* **The Outbox is growing:** check readiness/Kafka health and compare `booking.outbox.failed` and
-  `booking.outbox.published`. Retry logs contain attempt and backoff, but never broker credentials.
-* **A projection is not converging:** inspect consumer failure/DLT counters and ordering-gap retry logs, correct the
-  missing sequence, and reprocess the DLT according to the operational procedure.
-* **Capacity rejections are increasing:** query `booking.reservation.rejected` with
-  `reason=insufficient_capacity`; this is an expected flash-sale outcome rather than an application ERROR.
+- **Uma reserva falhou:** pesquise nos logs o `correlationId` da resposta e refine por `reservationId`, `eventId` e
+  `eventType`.
+- **A projeção está atrasada:** inspecione `booking.outbox.pending`, `booking.consumer.failed`,
+  `booking.consumer.retry` e `booking.consumer.dlt`.
+- **A Outbox cresce:** confira prontidão/Kafka e compare `booking.outbox.failed` com `booking.outbox.published`.
+- **A projeção não converge:** corrija a sequência ausente e reprocesse a DLT conforme o procedimento operacional.
+- **Rejeições aumentaram:** consulte `booking.reservation.rejected` com `reason=insufficient_capacity`; esse é um
+  resultado esperado da venda relâmpago, não um ERROR.
 
-Distributed tracing is not introduced for this monolith. If the system is split into services, OpenTelemetry trace
-context and a collector can complement—not replace—the correlation contract.
+Tracing distribuído não foi introduzido neste monólito. Se ele for dividido, OpenTelemetry pode complementar, e não
+substituir, o contrato de correlação.

@@ -11,7 +11,7 @@ por `(eventType,eventVersion)` e manter leitores v1 durante uma migração para 
 O agregado de ordenação é o evento comercial (`aggregateId=eventId`) e a key Kafka é esse ID. A versão cresce no mesmo
 update atômico que altera capacidade. Isso preserva a ordem por evento sem impor ordem global.
 
-## Transactional Outbox
+## Outbox transacional
 
 O caso de uso grava estado e envelope na mesma transação. O publisher reivindica até 100 registros com
 `FOR UPDATE SKIP LOCKED`, marca `PROCESSING` e um lease de um minuto, e confirma a transação antes do I/O de rede.
@@ -28,14 +28,14 @@ O tópico é `booking.domain-events` (seis partitions) e a DLT é `booking.domai
 `acks=all` e idempotência do producer. O consumer tenta novamente duas vezes com intervalo de um segundo; envelope
 inválido, versão desconhecida ou gap persistente segue então para DLT, sem bloquear indefinidamente a partition.
 
-## Inbox, projeção e ordering
+## Inbox, projeção e ordenação
 
 O consumer insere `(event_id, consumer)` na Inbox e atualiza a projeção na mesma transação. Conflito significa replay e
 é ignorado. Updates aceitam apenas `incomingVersion = lastVersion + 1`; versões antigas não regridem a projeção. Gap é
 falha observável e vai a retry/DLT. A recuperação operacional é corrigir/republicar a sequência e reprocessar a DLT ou
 reconstruir a projeção a partir do write model; reconstrução automática não faz parte desta fase.
 
-`GET /events/{id}` usa a projeção e pode estar temporariamente atrasado. A operação de reserva usa somente o update
+`GET /eventos/{id}` usa a projeção e pode estar temporariamente atrasado. A operação de reserva usa somente o update
 condicional `available_tickets >= quantity`, protegido e validado por constraints no PostgreSQL.
 
 ## Idempotência e observabilidade

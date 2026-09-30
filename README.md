@@ -1,113 +1,92 @@
 # Flash Booking
 
-## Overview
+## Visão geral
 
-Flash Booking is the transactional core of a limited-capacity ticket platform. During a flash sale, many application
-instances may compete for the same event; PostgreSQL remains the authority and an atomic conditional update prevents
-overselling. Reservation commands are strongly consistent, while event availability is a deliberately eventually
-consistent projection fed through a transactional Outbox, Kafka and an idempotent Inbox consumer.
+Flash Booking é o núcleo transacional de uma plataforma de ingressos com capacidade limitada. Durante uma venda
+relâmpago, várias instâncias podem disputar o mesmo evento; o PostgreSQL continua sendo a fonte de verdade, e uma
+atualização condicional atômica impede vendas acima da capacidade. Os comandos de reserva têm consistência forte,
+enquanto a disponibilidade é uma projeção intencionalmente eventual, alimentada por Outbox transacional, Kafka e um
+consumidor Inbox idempotente.
 
-The demonstration is entirely local: no cloud account, remote database, managed Kafka, SaaS, or external secret manager
-is required.
+A demonstração funciona inteiramente no ambiente local: não exige conta de nuvem, banco remoto, Kafka gerenciado, SaaS
+nem gerenciador externo de segredos.
 
-## Architecture
+## Arquitetura
 
 ```mermaid
 flowchart LR
-  C[Client] --> N[Nginx :8080]
-  N --> A[REST / Application / Domain]
-  A -->|one transaction| P[(PostgreSQL<br/>business state + Outbox)]
-  P --> O[Outbox publisher]
+  C[Cliente] --> N[Nginx :8080]
+  N --> A[REST / Aplicação / Domínio]
+  A -->|uma transação| P[(PostgreSQL<br/>estado de negócio + Outbox)]
+  P --> O[Publicador da Outbox]
   O --> K[Kafka]
-  K --> I[Inbox consumer]
-  I --> R[(Availability projection)]
+  K --> I[Consumidor Inbox]
+  I --> R[(Projeção de disponibilidade)]
   R --> A
 ```
 
-The code follows pragmatic hexagonal boundaries: HTTP and persistence/messaging are adapters around application ports
-and domain objects. CQRS is applied specifically to event availability; reservation lookup still reads its transactional
-table. This is event-driven state propagation, **not Event Sourcing**.
+O código segue fronteiras hexagonais pragmáticas: HTTP, persistência e mensageria são adaptadores ao redor das portas de
+aplicação e dos objetos de domínio. O CQRS é aplicado especificamente à disponibilidade; a consulta de reserva ainda lê
+sua tabela transacional. Trata-se de propagação de estado orientada a eventos, **não de Event Sourcing**.
 
-## Technology Stack
+## Tecnologias
 
-- **Java 21 / Spring Boot 3** — application and HTTP runtime.
-- **PostgreSQL 17** — authoritative capacity, reservations, idempotency, Outbox, Inbox, and projection storage.
-- **Kafka (KRaft)** — local asynchronous event transport with at-least-once delivery.
-- **Flyway** — automatic schema creation and evolution.
-- **Springdoc OpenAPI / Swagger UI** — interactive API contract.
-- **Actuator, Micrometer, Prometheus registry** — health and metrics endpoints.
-- **Testcontainers, JUnit, ArchUnit, JaCoCo** — integration, concurrency, architecture, and coverage validation.
-- **k6** — optional containerized flash-sale load scenario.
+- **Java 21 / Spring Boot 3** — aplicação e execução HTTP.
+- **PostgreSQL 17** — capacidade autoritativa, reservas, idempotência, Outbox, Inbox e projeção.
+- **Kafka (KRaft)** — transporte assíncrono local com entrega pelo menos uma vez.
+- **Flyway** — criação e evolução automática do schema.
+- **Springdoc OpenAPI / Swagger UI** — contrato interativo da API.
+- **Actuator, Micrometer e Prometheus registry** — endpoints de saúde e métricas.
+- **Testcontainers, JUnit, ArchUnit e JaCoCo** — testes de integração, concorrência, arquitetura e cobertura.
+- **k6** — cenário opcional e conteinerizado de carga para venda relâmpago.
 
-## Key Engineering Decisions
+## Principais decisões de engenharia
 
-- **Zero oversell:** `UPDATE events ... WHERE available_tickets >= ?` is atomic; database constraints are the final
-  guard.
-- **Idempotency:** a transaction-scoped PostgreSQL advisory lock and persistent unique key serialize same-key races
-  across
-  instances; same payload replays the original result and a changed payload returns `409`.
-- **Transactional Outbox:** business state and a versioned event envelope commit together, avoiding a database/Kafka
-  dual-write window.
-- **At-least-once Kafka + Inbox:** duplicates can occur between broker acknowledgement and Outbox completion; the
-  consumer
-  deduplicates `(event_id, consumer)` in the projection transaction.
-- **CQRS for availability:** `GET /events/{id}` reads an asynchronous projection. Kafka never decides whether a ticket
-  is sold.
-- **Single-winner terminal transitions:** row locks and `SKIP LOCKED` coordinate cancellation and expiration workers.
+- **Nenhuma venda excessiva:** `UPDATE events ... WHERE available_tickets >= ?` é atômico; as constraints do banco são
+  a proteção final.
+- **Idempotência:** advisory lock transacional no PostgreSQL e chave única persistente serializam disputas da mesma chave
+  entre instâncias. O mesmo payload repete o resultado original; um payload diferente retorna `409`.
+- **Outbox transacional:** estado de negócio e envelope versionado são confirmados juntos, evitando dual write.
+- **Kafka pelo menos uma vez + Inbox:** duplicatas podem ocorrer; o consumidor deduplica `(event_id, consumer)`.
+- **CQRS para disponibilidade:** `GET /eventos/{id}` lê uma projeção assíncrona. O Kafka nunca decide uma venda.
+- **Uma única transição terminal vencedora:** locks de linha e `SKIP LOCKED` coordenam cancelamento e expiração.
 
-See the [ADRs](docs/adr/) and [architecture detail](docs/architecture.md).
+Consulte os [ADRs](docs/adr/) e os [detalhes da arquitetura](docs/architecture.md).
 
-## Running Locally
+## Execução local
 
-Prerequisite: Docker with Docker Compose (Git is needed only to clone). Java, Maven, PostgreSQL, Kafka, and k6 do not
-need
-to be installed for the main path.
+Pré-requisito: Docker com Docker Compose (Git é necessário apenas para clonar). O fluxo principal não exige Java,
+Maven, PostgreSQL, Kafka ou k6 instalados na máquina.
 
 ```bash
 docker compose up --build
 ```
 
-Compose starts PostgreSQL, Kafka, one or more application replicas, and an Nginx entry point. Health checks order
-startup;
-Flyway migrates an empty database and Spring creates the Kafka topics. Local-only defaults are `flash/flash` for the
-PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5433` by default (configurable
-with `POSTGRES_PORT`), and Kafka `9092`; the last two are exposed for optional development/debugging.
-
-The proxy configuration is copied into its image at build time rather than bind-mounted from the host. This keeps the
-container independent of Docker Desktop's host-file sharing implementation and makes `nginx -t` validate the effective
-configuration during the image build. The proxy health check then verifies the complete Nginx-to-application readiness
-path.
+O Compose inicia PostgreSQL, Kafka, uma ou mais réplicas da aplicação e o Nginx. O Flyway migra o banco vazio e o Spring
+cria os tópicos Kafka. Os padrões locais são usuário/senha `flash/flash`. As portas expostas são `8080` para a aplicação,
+`5433` para PostgreSQL (configurável com `POSTGRES_PORT`) e `9092` para Kafka.
 
 ```bash
-docker compose down       # keep PostgreSQL volume
-docker compose down -v    # also delete local data
+docker compose down       # preserva o volume do PostgreSQL
+docker compose down -v    # também apaga os dados locais
 ```
 
-No `.env` file is required. Runtime overrides include `DB_*`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_EVENTS_TOPIC`,
-`RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS`, and `SERVER_PORT`.
+Não é necessário arquivo `.env`. As principais variáveis são `DB_*`, `KAFKA_BOOTSTRAP_SERVERS`,
+`KAFKA_EVENTS_TOPIC`, `RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS` e `SERVER_PORT`.
 
-### Running the application from the IDE
+### Execução pela IDE
 
-When the Spring Boot application runs on the host (for example, from IntelliJ), start only its infrastructure
-dependencies. Starting the complete Compose stack also starts another application instance and reserves host port
-`8080` for Nginx.
+Ao executar a aplicação Spring Boot na máquina, inicie apenas a infraestrutura:
 
 ```bash
 docker compose up -d postgres kafka
 ./mvnw spring-boot:run
 ```
 
-The application's defaults match Compose: database `flash_booking`, user/password `flash/flash`, PostgreSQL on
-`localhost:5433`, and Kafka on `localhost:9092`. Port `5433` is intentional: it prevents an application started from the
-IDE from silently connecting to another PostgreSQL installation on the standard port `5432`. An IDE run configuration
-therefore does not need environment variables
-unless those defaults have been overridden. The Compose health check performs an authenticated query (rather than only
-checking whether a PostgreSQL server is listening), so an old or incorrectly initialized database is reported as
-unhealthy before the application starts.
+Os padrões coincidem com o Compose: banco `flash_booking`, usuário/senha `flash/flash`, PostgreSQL em `localhost:5433` e
+Kafka em `localhost:9092`. A porta `5433` evita conexão acidental com outro PostgreSQL na porta padrão `5432`.
 
-If startup reports `FATAL: role "flash" does not exist`, PostgreSQL is reachable, but the server listening on port
-configured by `DB_URL` was not initialized with this project's credentials. Recreate the PostgreSQL container so the
-current port mapping is applied, then verify the exact host port and initialization log:
+Se aparecer `FATAL: role "flash" does not exist`, recrie o container e confira a porta e o log:
 
 ```bash
 docker compose up -d --force-recreate postgres kafka
@@ -115,45 +94,33 @@ docker compose port postgres 5432
 docker compose logs postgres
 ```
 
-`docker compose port postgres 5432` must print `5433` as the host port (the address can be `0.0.0.0`, `127.0.0.1`, or
-`[::]`). Also remove stale `DB_URL`, `DB_USER`, `DB_PASSWORD`, or `SPRING_DATASOURCE_*` values from the IDE run
-configuration; otherwise they override the defaults above.
-
-The official PostgreSQL image applies `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` only when it initializes an
-empty data directory. Consequently, a named volume created with older credentials is not changed by restarting the
-container. For disposable local data, recreate that volume and start the infrastructure again:
+O comando de porta deve mostrar `5433`. Remova também valores antigos de `DB_URL`, `DB_USER`, `DB_PASSWORD` ou
+`SPRING_DATASOURCE_*` da configuração da IDE. A imagem oficial só aplica `POSTGRES_DB`, `POSTGRES_USER` e
+`POSTGRES_PASSWORD` ao inicializar um diretório vazio. Para dados locais descartáveis:
 
 ```bash
 docker compose down -v
 docker compose up -d postgres kafka
 ```
 
-This deletes the local PostgreSQL data. The Compose volume is versioned as `postgres_data_v1`, ensuring installations
-that used an older project volume get a clean initialization with the documented credentials. If the data must be
-preserved, create the `flash` login/database with an existing
-PostgreSQL administrator or set `DB_URL`, `DB_USER`, and `DB_PASSWORD` in the IDE to credentials already present in that
-database instead of removing the volume.
-
-To use a host port other than `5433`, publish the container on that port and give the host-run application the matching
-JDBC URL:
+Para usar outra porta no host:
 
 ```bash
 POSTGRES_PORT=15432 docker compose up -d --force-recreate postgres kafka
 DB_URL=jdbc:postgresql://localhost:15432/flash_booking ./mvnw spring-boot:run
 ```
 
-## API / Swagger
+## API e Swagger
 
 - API: <http://localhost:8080>
 - Swagger UI: <http://localhost:8080/swagger-ui.html>
-- OpenAPI JSON: <http://localhost:8080/v3/api-docs>
+- JSON OpenAPI: <http://localhost:8080/v3/api-docs>
 
-The public contract consists of `POST /events`, `GET /events/{id}`, `POST /events/{id}/reservations`,
-`GET /reservations/{id}`, and `DELETE /reservations/{id}`. Reservation creation requires `Idempotency-Key` (1–160
-chars).
-Errors use `application/problem+json` `ProblemDetail` documents.
+O contrato público contém `POST /eventos`, `GET /eventos/{id}`, `POST /eventos/{id}/reservas`,
+`GET /reservas/{id}` e `DELETE /reservas/{id}`. A criação de reserva exige `Idempotency-Key` de 1 a 160 caracteres.
+Erros usam documentos `ProblemDetail` com o tipo `application/problem+json`.
 
-## Example Flow
+## Fluxo de exemplo
 
 ```bash
 ./scripts/demo.sh
@@ -161,62 +128,60 @@ Errors use `application/problem+json` `ProblemDetail` documents.
 ./scripts/demo-concurrency.sh
 ```
 
-The scripts use POSIX shell, `curl`, and standard text utilities; IDs are created dynamically. `demo.sh` waits for
-readiness, creates and queries an event, reserves, replays the same key, observes projected availability, cancels, and
-observes the final state.
+Os scripts usam shell POSIX, `curl` e utilitários padrão; os IDs são criados dinamicamente. O `demo.sh` aguarda a
+prontidão, cria e consulta um evento, reserva, repete a mesma chave, observa a projeção, cancela e confere o estado final.
 
-## Testing
+## Testes
 
-For development outside containers, use Java 21; the committed wrapper downloads Maven 3.9.11 on first use:
+Utilize Java 21 fora dos containers. O wrapper baixa Maven 3.9.11 na primeira execução:
 
 ```bash
-./mvnw clean test    # unit, application, API, messaging unit, and ArchUnit tests
-./mvnw clean verify  # also Testcontainers integration/concurrency tests and JaCoCo report
+./mvnw clean test    # testes unitários, de aplicação, API, mensageria e ArchUnit
+./mvnw clean verify  # inclui integração/concorrência com Testcontainers e relatório JaCoCo
 ```
 
-The full suite needs a Docker daemon for Testcontainers. Details: [docs/testing.md](docs/testing.md).
+A suíte completa requer um daemon Docker. Veja [docs/testing.md](docs/testing.md).
 
-## Load Testing and Multiple Instances
+## Teste de carga e múltiplas instâncias
 
 ```bash
 docker compose up --build --scale app=3
 EVENT_ID=<uuid> VUS=100 DURATION=30s QUANTITY=1 docker compose --profile load-test run --rm k6
 ```
 
-Nginx keeps one stable host port while Docker DNS discovers scaled `app` replicas. k6 treats `422` sellout responses as
-business outcomes, not technical failures; it is a load demonstration, not the correctness proof.
+O Nginx mantém uma porta estável enquanto o DNS do Docker encontra as réplicas. O k6 trata respostas `422` por
+ingressos esgotados como resultado de negócio, não falha técnica; ele demonstra carga, mas não prova correção.
 
-## Observability
+## Observabilidade
 
-- Health: <http://localhost:8080/actuator/health>
-- Liveness: <http://localhost:8080/actuator/health/liveness>
-- Readiness: <http://localhost:8080/actuator/health/readiness>
-- Metrics catalog: <http://localhost:8080/actuator/metrics>
-- Prometheus exposition: <http://localhost:8080/actuator/prometheus>
+- Saúde: <http://localhost:8080/actuator/health>
+- Vivacidade: <http://localhost:8080/actuator/health/liveness>
+- Prontidão: <http://localhost:8080/actuator/health/readiness>
+- Catálogo de métricas: <http://localhost:8080/actuator/metrics>
+- Formato Prometheus: <http://localhost:8080/actuator/prometheus>
 
-Clients may supply a UUID `X-Correlation-Id`; otherwise one is generated, returned, logged, and propagated in domain
-events. See [docs/observability.md](docs/observability.md).
+O cliente pode fornecer um UUID em `X-Correlation-Id`; caso contrário, um valor é gerado, devolvido, registrado e
+propagado nos eventos de domínio. Veja [docs/observability.md](docs/observability.md).
 
-## Documentation
+## Documentação
 
-- [Architecture](docs/architecture.md)
-- [Event-driven flow](docs/event-driven-architecture.md)
-- [Concurrency](docs/concurrency.md)
-- [Business rules](docs/business-rules.md)
-- [Testing](docs/testing.md)
-- [Observability](docs/observability.md)
-- [Code review guide](docs/code-review-guide.md)
-- [Architecture Decision Records](docs/adr/)
+- [Arquitetura](docs/architecture.md)
+- [Fluxo orientado a eventos](docs/event-driven-architecture.md)
+- [Concorrência](docs/concurrency.md)
+- [Regras de negócio](docs/business-rules.md)
+- [Testes](docs/testing.md)
+- [Observabilidade](docs/observability.md)
+- [Guia de revisão de código](docs/code-review-guide.md)
+- [Registros de decisões arquiteturais](docs/adr/)
 
-## Trade-offs
+## Compromissos arquiteturais
 
-PostgreSQL correctness is simple and strong but a single extremely popular event becomes a hot row. Transactional Outbox
-removes dual-write loss at the cost of polling and asynchronous visibility. At-least-once transport is practical but
-requires Inbox idempotency. The availability projection decouples query work but may briefly return an old value or
-`404`.
+O PostgreSQL oferece correção simples e forte, mas um evento extremamente popular vira uma linha disputada. A Outbox
+remove a perda por dual write ao custo de polling e visibilidade assíncrona. O transporte pelo menos uma vez exige
+idempotência na Inbox. A projeção desacopla consultas, mas pode retornar temporariamente um valor antigo ou `404`.
 
-## Future Improvements
+## Melhorias futuras
 
-At substantially larger scale, evaluate partitioned event ownership or sharding, CDC/Debezium instead of Outbox polling,
-a dedicated read store, schema governance, backpressure and a waiting room, rate limiting, autoscaling, distributed
-tracing, and history retention/partitioning. Authentication and payment workflow are intentionally outside this case.
+Em escala muito maior, avaliar propriedade particionada de eventos ou sharding, CDC/Debezium no lugar do polling da
+Outbox, armazenamento de leitura dedicado, governança de schemas, backpressure, sala de espera, limitação de taxa,
+autoscaling, tracing distribuído e retenção/particionamento de histórico. Autenticação e pagamentos estão fora do escopo.
