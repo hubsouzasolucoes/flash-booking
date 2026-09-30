@@ -73,6 +73,11 @@ Flyway migrates an empty database and Spring creates the Kafka topics. Local-onl
 PostgreSQL user/password. Ports exposed to the host are application `8080`, PostgreSQL `5433` by default (configurable
 with `POSTGRES_PORT`), and Kafka `9092`; the last two are exposed for optional development/debugging.
 
+The proxy configuration is copied into its image at build time rather than bind-mounted from the host. This keeps the
+container independent of Docker Desktop's host-file sharing implementation and makes `nginx -t` validate the effective
+configuration during the image build. The proxy health check then verifies the complete Nginx-to-application readiness
+path.
+
 ```bash
 docker compose down       # keep PostgreSQL volume
 docker compose down -v    # also delete local data
