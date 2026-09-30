@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/events")
-@Tag(name = "Events", description = "Cadastro de eventos e consulta de capacidade")
+@RequestMapping("/eventos")
+@Tag(name = "Eventos", description = "Cadastro de eventos e consulta de capacidade")
 public class EventController {
     private final EventUseCases events;
 
@@ -25,7 +25,7 @@ public class EventController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create an event", description = "Creates the authoritative inventory for a future event.", responses = {
+    @Operation(summary = "Criar um evento", description = "Cria o inventário autoritativo de um evento futuro.", responses = {
             @ApiResponse(responseCode = "201", description = "Evento criado"),
             @ApiResponse(responseCode = "400", description = "Corpo inválido")})
     public Response create(@Valid @RequestBody CreateRequest request) {
@@ -33,8 +33,9 @@ public class EventController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get event availability", description = "Returns the availability read model. The value may " +
-            "be briefly stale while the asynchronous Outbox/Kafka projection is processing.", responses = {
+    @Operation(summary = "Consultar a disponibilidade de um evento", description = "Retorna o modelo de leitura de " +
+            "disponibilidade. O valor pode ficar brevemente desatualizado enquanto a projeção assíncrona via " +
+            "Outbox/Kafka estiver sendo processada.", responses = {
             @ApiResponse(responseCode = "200", description = "Evento encontrado"),
             @ApiResponse(responseCode = "404", description = "Evento inexistente")})
     public Response get(@PathVariable UUID id) {

@@ -1,21 +1,21 @@
 # ADR-004: CQRS somente para disponibilidade
 
-## Status
+## Situação
 
-Accepted
+Aceita
 
-## Context
+## Contexto
 
 A consulta de disponibilidade é quente, mas não pode enfraquecer zero overselling.
 
-## Decision
+## Decisão
 
-`GET /events/{id}` lê projeção assíncrona. Commands usam exclusivamente estado autoritativo e update condicional.
+`GET /eventos/{id}` lê projeção assíncrona. Os comandos usam exclusivamente o estado autoritativo e a atualização condicional.
 
-## Consequences
+## Consequências
 
 Leitura escala e pode estar atrasada. Inbox e versão impedem duplicação/regressão.
 
-## Alternatives Considered
+## Alternativas consideradas
 
 Usar a projeção para conceder ingressos foi rejeitado; duplicar todo o modelo também.

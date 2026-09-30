@@ -6,9 +6,9 @@ PostgreSQL, Kafka, Outbox, Inbox e schedulers. A direção permanece `interfaces
 
 ## Fluxos
 
-* **Write:** REST → caso de uso → estado relacional autoritativo + evento na Outbox, na mesma transação PostgreSQL.
-* **Async:** Outbox claim → Kafka → consumer → Inbox + projeção, na mesma transação PostgreSQL do consumer.
-* **Read:** REST → `event_availability_projection`, eventualmente consistente.
+* **Escrita:** REST → caso de uso → estado relacional autoritativo + evento na Outbox, na mesma transação PostgreSQL.
+* **Assíncrono:** reivindicação da Outbox → Kafka → consumidor → Inbox + projeção, na mesma transação PostgreSQL do consumidor.
+* **Leitura:** REST → `event_availability_projection`, eventualmente consistente.
 
 A capacidade é concedida apenas pelo update condicional do write model. Kafka e a projeção nunca participam da decisão
 anti-oversell. Idempotência HTTP, identificador do evento, versão do agregado e Inbox são mecanismos distintos.
@@ -22,51 +22,52 @@ as decisões resumidas em [adr](adr/).
 Os mecanismos e provas para concorrência estão detalhados em [concurrency.md](concurrency.md) e no
 [ADR 006](adr/006-concurrency-control.md).
 
-## Component flow
+## Fluxo dos componentes
 
 ```mermaid
 flowchart TD
-  HTTP[HTTP controllers] --> APP[Application use cases]
-  APP --> DOMAIN[Domain objects]
-  APP --> PORTS[Repository / Outbox ports]
-  PORTS --> DB[(PostgreSQL write model + Outbox)]
-  DB --> PUB[Outbox publisher]
+  HTTP[Controllers HTTP] --> APP[Casos de uso da aplicação]
+  APP --> DOMAIN[Objetos de domínio]
+  APP --> PORTS[Portas de repositório / Outbox]
+  PORTS --> DB[(Modelo de escrita PostgreSQL + Outbox)]
+  DB --> PUB[Publicador da Outbox]
   PUB --> K[Kafka]
-  K --> CON[Projection consumer]
+  K --> CON[Consumidor da projeção]
   CON --> IN[(Inbox + availability projection)]
-  HTTP -->|event query| IN
+  HTTP -->|consulta de evento| IN
 ```
 
-Infrastructure depends inward on application ports and domain types; the domain does not import Spring, JPA, Kafka, or
-HTTP. `interfaces` translates public transport contracts, and configuration wires adapters.
+A infraestrutura depende internamente das portas da aplicação e dos tipos de domínio; o domínio não importa Spring,
+JPA, Kafka nem HTTP. O pacote `interfaces` traduz os contratos públicos de transporte, e a configuração conecta os
+adaptadores.
 
-## Reservation sequence
+## Sequência de reserva
 
 ```mermaid
 sequenceDiagram
-  participant Client
+  participant Cliente
   participant API
   participant UseCase as Reservation use case
   participant PG as PostgreSQL
-  participant Publisher as Outbox publisher
+  participant Publisher as Publicador da Outbox
   participant Kafka
   participant Consumer
   participant Projection
-  Client->>API: POST reservation + Idempotency-Key
+  Cliente->>API: POST reserva + Idempotency-Key
   API->>UseCase: create(eventId, quantity, key)
   rect rgb(235,245,255)
-    Note over UseCase,PG: one PostgreSQL transaction
+    Note over UseCase,PG: uma transação PostgreSQL
     UseCase->>PG: advisory lock + idempotency lookup
-    UseCase->>PG: conditional capacity UPDATE
-    UseCase->>PG: reservation + idempotency + Outbox INSERT
+    UseCase->>PG: UPDATE condicional da capacidade
+    UseCase->>PG: reserva + idempotência + Outbox INSERT
   end
-  UseCase-->>Client: 201 reservation
-  Publisher->>PG: claim with SKIP LOCKED
-  Publisher->>Kafka: keyed versioned event
-  Kafka->>Consumer: at-least-once delivery
+  UseCase-->>Cliente: 201 reserva
+  Publicador->>PG: reivindicação com SKIP LOCKED
+  Publicador->>Kafka: evento versionado com chave
+  Kafka->>Consumer: entrega pelo menos uma vez
   rect rgb(240,255,240)
-    Note over Consumer,Projection: one consumer transaction
-    Consumer->>PG: Inbox INSERT
-    Consumer->>Projection: version-checked update
+    Note over Consumer,Projection: uma transação do consumidor
+    Consumer->>PG: INSERT na Inbox
+    Consumer->>Projection: atualização com verificação de versão
   end
 ```

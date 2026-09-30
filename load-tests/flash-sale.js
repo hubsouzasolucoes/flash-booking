@@ -15,7 +15,7 @@ const unexpectedErrors = new Rate('unexpected_errors');
 const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
 
 export default function () {
-    const response = http.post(`${baseUrl}/events/${__ENV.EVENT_ID}/reservations`,
+    const response = http.post(`${baseUrl}/eventos/${__ENV.EVENT_ID}/reservas`,
         JSON.stringify({quantity: Number(__ENV.QUANTITY || 1)}), {
             headers: {'Content-Type': 'application/json', 'Idempotency-Key': `k6-${__VU}-${__ITER}`}
         });
