@@ -49,7 +49,8 @@ sua tabela transacional. Trata-se de propagação de estado orientada a eventos,
 - **Outbox transacional:** estado de negócio e envelope versionado são confirmados juntos, evitando dual write.
 - **Kafka pelo menos uma vez + Inbox:** duplicatas podem ocorrer; o consumidor deduplica `(event_id, consumer)`.
 - **CQRS para disponibilidade:** `GET /eventos/{id}` lê uma projeção assíncrona. O Kafka nunca decide uma venda.
-- **Uma única transição terminal vencedora:** locks de linha e `SKIP LOCKED` coordenam cancelamento e expiração.
+- **Aprovação automática:** a reserva permanece `PENDING` por dez segundos e um worker com `SKIP LOCKED` a aprova;
+  a capacidade já fica retida atomicamente desde a criação para impedir venda excessiva.
 
 Consulte os [ADRs](docs/adr/) e os [detalhes da arquitetura](docs/architecture.md).
 
@@ -72,7 +73,7 @@ docker compose down -v    # também apaga os dados locais
 ```
 
 Não é necessário arquivo `.env`. As principais variáveis são `DB_*`, `KAFKA_BOOTSTRAP_SERVERS`,
-`KAFKA_EVENTS_TOPIC`, `RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `EXPIRATION_FIXED_DELAY_MS` e `SERVER_PORT`.
+`KAFKA_EVENTS_TOPIC`, `RESERVATION_TTL`, `OUTBOX_FIXED_DELAY_MS`, `APPROVAL_FIXED_DELAY_MS` e `SERVER_PORT`.
 
 ### Execução pela IDE
 

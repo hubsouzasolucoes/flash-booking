@@ -44,6 +44,11 @@ public class EventUseCases {
     @Transactional(readOnly = true)
     public EventAvailability.View getAvailability(UUID id) {
         return availability.findById(id)
-                .orElseThrow(() -> new ApplicationException(EVENT_NOT_FOUND, "Event projection not found yet"));
+                // The Kafka projection is eventually consistent. Immediately after POST it may not exist yet,
+                // so fall back to the authoritative row rather than returning a misleading 404.
+                .or(() -> events.findById(id).map(event -> new EventAvailability.View(
+                        event.id(), event.name(), event.startsAt(), event.capacity(), event.availableTickets(),
+                        event.createdAt(), event.createdAt(), event.version())))
+                .orElseThrow(() -> new ApplicationException(EVENT_NOT_FOUND, "Event not found"));
     }
 }

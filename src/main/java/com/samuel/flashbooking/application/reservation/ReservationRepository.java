@@ -15,4 +15,6 @@ public interface ReservationRepository {
     Optional<Reservation> findByIdForUpdate(UUID id);
 
     List<Reservation> findExpiredForUpdate(Instant now, int limit);
+
+    List<Reservation> findPendingForApproval(Instant now, int limit);
 }

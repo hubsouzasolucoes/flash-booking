@@ -43,6 +43,13 @@ public final class Reservation {
         return true;
     }
 
+    public boolean approve(Instant now) {
+        if (status != ReservationStatus.PENDING || expiresAt.isAfter(now)) return false;
+        status = ReservationStatus.APPROVED;
+        updatedAt = now;
+        return true;
+    }
+
     public UUID id() {
         return id;
     }

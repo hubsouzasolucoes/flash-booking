@@ -9,8 +9,8 @@
 | Kafka | `KafkaConfiguration`, `application.yml`, `DomainEvent` |
 | Inbox | `AvailabilityProjectionConsumer`, tabela `inbox_events` na migration `V3` |
 | CQRS/consistência eventual | `PostgresEventAvailability`, `AvailabilityProjectionConsumer`, `EventUseCases.getAvailability` |
-| Expiração | `ReservationExpirationScheduler`, `ReservationUseCases.expireBatch`, índice de expiração em `V1` |
-| Disputas entre cancelamento e expiração | `findByIdForUpdate`, `findExpiredForUpdate`, `ReservationConcurrencyIT` |
+| Aprovação automática | `ReservationApprovalScheduler`, `ReservationUseCases.approveBatch`, índice de status/instante em `V1` |
+| Disputas entre cancelamento e aprovação | `findByIdForUpdate`, `findPendingForApproval`, `SKIP LOCKED` |
 | HTTP e erros | controllers, DTOs, `ApiExceptionHandler`, `CorrelationIdFilter` |
 | Testes | `src/test`, `pom.xml`, `load-tests/flash-sale.js` |
 | Observabilidade | `ApplicationConfiguration`, `KafkaHealthIndicator`, métricas e logs nos casos de uso e mensageria |

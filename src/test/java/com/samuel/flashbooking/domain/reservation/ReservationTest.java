@@ -27,4 +27,15 @@ class ReservationTest {
         assertThat(reservation.expire(NOW.plusSeconds(61))).isFalse();
         assertThat(reservation.status()).isEqualTo(ReservationStatus.EXPIRED);
     }
+
+    @Test
+    void approvesOnlyWhenPendingPeriodHasElapsed() {
+        var reservation = Reservation.create(UUID.randomUUID(), 1, NOW.plusSeconds(10), NOW);
+
+        assertThat(reservation.approve(NOW.plusSeconds(9))).isFalse();
+        assertThat(reservation.approve(NOW.plusSeconds(10))).isTrue();
+        assertThat(reservation.approve(NOW.plusSeconds(11))).isFalse();
+        assertThat(reservation.status()).isEqualTo(ReservationStatus.APPROVED);
+        assertThat(reservation.updatedAt()).isEqualTo(NOW.plusSeconds(10));
+    }
 }
