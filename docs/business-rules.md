@@ -12,13 +12,14 @@ pelo `UPDATE` condicional do banco de dados autoritativo.
 ```mermaid
 stateDiagram-v2
   [*] --> PENDING
+  PENDING --> APPROVED: 10 segundos após a criação
   PENDING --> CANCELLED: cancelamento pelo cliente
-  PENDING --> EXPIRED: expiresAt <= horário do worker
 ```
 
-Uma reserva começa como `PENDING` e, por padrão, expira dez minutos após a criação (`RESERVATION_TTL` é configurável).
-Somente reservas pendentes consomem capacidade. Repetir o cancelamento de uma reserva já cancelada é seguro; cancelar
-uma reserva expirada retorna conflito. Cancelamento e expiração devolvem a capacidade exatamente uma vez.
+Uma reserva começa como `PENDING` e é aprovada por um worker depois de dez segundos por padrão
+(`RESERVATION_TTL` é configurável). O campo legado `expiresAt` representa o instante agendado para essa aprovação.
+A capacidade é retida atomicamente durante a criação, evitando vendas acima do limite enquanto a aprovação está
+pendente. Repetir o cancelamento de uma reserva já cancelada é seguro; cancelar uma reserva aprovada retorna conflito.
 
 ## Idempotência
 
@@ -29,5 +30,6 @@ outra impressão digital retorna HTTP 409. Os registros são persistentes e comp
 ## Disponibilidade
 
 Os comandos de reserva usam a linha transacional da tabela `events`. `GET /eventos/{id}` usa a projeção
-`event_availability_projection`, atualizada de forma assíncrona por eventos de domínio versionados. Ela pode ficar
-brevemente desatualizada ou retornar 404 logo após a criação do evento, mas nunca autoriza uma venda.
+`event_availability_projection`, atualizada de forma assíncrona por eventos de domínio versionados. Enquanto a projeção
+ainda não existe logo após a criação, a consulta usa a linha autoritativa como fallback em vez de retornar um falso 404.
+Uma projeção já existente ainda pode ficar brevemente desatualizada, mas nunca autoriza uma venda.

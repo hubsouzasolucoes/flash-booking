@@ -61,9 +61,9 @@ logging:
   pattern:
     level: "%5p correlationId=%X{correlationId:-none}"
 app:
-  reservation-ttl: ${RESERVATION_TTL:PT10M}
+  reservation-ttl: ${RESERVATION_TTL:PT10S}
   outbox-fixed-delay: ${OUTBOX_FIXED_DELAY_MS:1000}
-  expiration-fixed-delay: ${EXPIRATION_FIXED_DELAY_MS:5000}
+  approval-fixed-delay: ${APPROVAL_FIXED_DELAY_MS:1000}
   kafka:
     events-topic: ${KAFKA_EVENTS_TOPIC:booking.domain-events}
     consumer-group: ${KAFKA_CONSUMER_GROUP:flash-booking-availability-v1}

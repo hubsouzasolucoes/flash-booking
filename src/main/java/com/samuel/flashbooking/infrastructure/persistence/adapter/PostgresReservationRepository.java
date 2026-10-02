@@ -39,6 +39,11 @@ public class PostgresReservationRepository implements ReservationRepository {
         return repository.findExpiredForUpdate(now, limit).stream().map(this::domain).toList();
     }
 
+    @Override
+    public List<Reservation> findPendingForApproval(Instant now, int limit) {
+        return repository.findPendingForApproval(now, limit).stream().map(this::domain).toList();
+    }
+
     private ReservationEntity entity(Reservation r) {
         return new ReservationEntity(r.id(), r.eventId(), r.quantity(), r.status(), r.expiresAt(), r.createdAt(), r.updatedAt());
     }

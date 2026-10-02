@@ -31,6 +31,11 @@ public class PostgresEventRepository implements EventRepository {
     }
 
     @Override
+    public Optional<Event> findById(UUID id) {
+        return repository.findById(id).map(this::domain);
+    }
+
+    @Override
     public Optional<CapacityState> reserveCapacity(UUID id, int quantity) {
         return updateCapacity("available_tickets - :quantity", "available_tickets >= :quantity", id, quantity);
     }

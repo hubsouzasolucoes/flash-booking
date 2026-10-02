@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.*;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static com.samuel.flashbooking.application.ApplicationException.ErrorCode.IDEMPOTENCY_CONFLICT;
@@ -97,6 +98,18 @@ class ReservationUseCasesTest {
         assertThat(useCases.cancel(id).status()).isEqualTo(ReservationStatus.CANCELLED);
         verify(events, never()).releaseCapacity(any(), anyInt());
         verify(outbox, never()).append(any());
+    }
+
+    @Test
+    void approvesDuePendingReservations() {
+        Reservation reservation = Reservation.create(UUID.randomUUID(), 2, NOW, NOW.minusSeconds(10));
+        when(reservations.findPendingForApproval(NOW, 100)).thenReturn(List.of(reservation));
+        when(reservations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(useCases.approveBatch()).isEqualTo(1);
+        assertThat(reservation.status()).isEqualTo(ReservationStatus.APPROVED);
+        verify(reservations).save(reservation);
+        assertThat(metrics.counter("booking.reservation.approved").count()).isEqualTo(1);
     }
 
 }

@@ -36,6 +36,7 @@ public class ReservationUseCases {
     private final Counter replayed;
     private final Counter cancelled;
     private final Counter expiredCounter;
+    private final Counter approvedCounter;
     private final Counter idempotencyCreated;
     private final Counter idempotencyConflict;
     private final Counter idempotencyReplay;
@@ -57,6 +58,7 @@ public class ReservationUseCases {
         this.replayed = metrics.counter("booking.reservation.idempotent.replay");
         this.cancelled = metrics.counter("booking.reservation.cancelled");
         this.expiredCounter = metrics.counter("booking.reservation.expired");
+        this.approvedCounter = metrics.counter("booking.reservation.approved");
         this.idempotencyCreated = metrics.counter("booking.idempotency.created");
         this.idempotencyConflict = metrics.counter("booking.idempotency.conflict");
         this.idempotencyReplay = metrics.counter("booking.idempotency.replay");
@@ -131,6 +133,20 @@ public class ReservationUseCases {
     @Transactional
     public int expireBatch() {
         return expirationBatchDuration.record(this::expireReservations);
+    }
+
+    @Transactional
+    public int approveBatch() {
+        Instant now = clock.instant();
+        int approved = 0;
+        for (Reservation reservation : reservations.findPendingForApproval(now, EXPIRATION_BATCH_SIZE)) {
+            if (reservation.approve(now)) {
+                reservations.save(reservation);
+                approvedCounter.increment();
+                approved++;
+            }
+        }
+        return approved;
     }
 
     private int expireReservations() {

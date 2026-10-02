@@ -18,4 +18,8 @@ public interface JpaReservationRepository extends JpaRepository<ReservationEntit
     @Query(value = "SELECT * FROM reservations WHERE status = 'PENDING' AND expires_at <= :now " +
             "ORDER BY expires_at FOR UPDATE SKIP LOCKED LIMIT :limit", nativeQuery = true)
     List<ReservationEntity> findExpiredForUpdate(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = "SELECT * FROM reservations WHERE status = 'PENDING' AND expires_at <= :now " +
+            "ORDER BY expires_at FOR UPDATE SKIP LOCKED LIMIT :limit", nativeQuery = true)
+    List<ReservationEntity> findPendingForApproval(@Param("now") Instant now, @Param("limit") int limit);
 }
